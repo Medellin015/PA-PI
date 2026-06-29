@@ -181,9 +181,16 @@
       f.innerHTML = `
         <span class="text-xs txt-suave">Subsecretaría:</span>
         <select id="f-sub" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">${opts}</select>
+        <select id="f-nivel" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">
+          <option value="">Todos los niveles</option>
+          <option value="Programa">Solo programas</option>
+          <option value="Proyecto">Solo proyectos</option>
+          <option value="BIEN">Solo productos</option>
+        </select>
         <input id="f-busca" placeholder="Buscar producto o proyecto…" class="panel borde border rounded-lg px-3 py-1.5 text-xs w-56 focus:outline-none" />`;
       $('#f-sub').onchange = e => { filtroSubPA = e.target.value; render(); };
-      $('#f-busca').oninput = e => filtrarTexto(e.target.value);
+      $('#f-nivel').onchange = aplicarFiltrosPA;
+      $('#f-busca').oninput = aplicarFiltrosPA;
     } else {
       f.innerHTML = `
         <select id="f-tipo" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">
@@ -298,74 +305,108 @@
     return `<span class="text-[10px] px-2 py-0.5 rounded-full font-medium ${colores[s]||'bg-slate-500/15'}">${esc(corto[s]||s||'—')}</span>`;
   }
 
+  function badgeNivel(n){
+    const m = {
+      'Programa':'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+      'Proyecto':'bg-slate-500/20 text-slate-700 dark:text-slate-200',
+      'BIEN':'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    };
+    const txt = n==='BIEN' ? 'Producto' : n;
+    return `<span class="text-[9px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap ${m[n]||'bg-slate-500/15'}">${esc(txt)}</span>`;
+  }
+
+  // Plan de Acción como una sola tabla plana (Programa › Proyecto › Producto)
   function renderPA(){
     const prog = arbolPA();
-    let html = `<div class="space-y-3">`;
+    const filas = [];
     prog.forEach(pr => {
       const proyectos = pr.proyectos.filter(p => filtroSubPA==='Todas' || p.sub===filtroSubPA);
       if (!proyectos.length) return;
-      html += `<details open class="panel borde border rounded-xl overflow-hidden">
-        <summary class="px-4 py-2.5 flex items-center gap-2 select-none bg-black/[.02] dark:bg-white/[.03]">
-          <span class="chev txt-suave">▶</span>
-          <span class="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-300">${esc(pr.cod)}</span>
-          <span class="text-sm font-semibold">${esc(pr.desc)}</span>
-          <span class="ml-auto text-[11px] txt-suave">${proyectos.length} proyecto(s)</span>
-        </summary>
-        <div class="p-3 space-y-3">`;
-
+      filas.push(filaPA_prog(pr, proyectos.length));
       proyectos.forEach(py => {
-        const pa = parseNum(valTexto('pa',py,'pptoAj')) ?? py.pptoAj;
-        const ej = parseNum(valTexto('pa',py,'ej3006')) ?? py.ej3006;
-        const pejec = (pa && ej!=null) ? (ej/pa*100) : null;
-        const [ptxt,pcls,pbg] = colorPct(pejec);
-        const filas = py.productos.map(b => productoFila(b)).join('');
-        const editProj = sesion.rol==='admin';
-        html += `<div class="rounded-lg borde border anim-up">
-          <div class="px-3 py-2 flex flex-wrap items-center gap-2 border-b borde">
-            <span class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-500/10">${esc(py.cod)}</span>
-            <span class="text-sm font-medium">${esc(py.desc)}</span>
-            ${badgeSub(py.sub)}
-            <span class="ml-auto text-[11px] txt-suave">Ppto ajustado: <b>${fmtMill(py.pptoAj)}</b></span>
-            <span class="text-[11px] txt-suave">Ejec. 30/06: <b>${fmtMill(ej)}</b></span>
-            <span class="text-[11px] px-2 py-0.5 rounded ${pcls} ${pbg}">${ptxt}</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left">
-              <thead><tr class="text-[10px] uppercase tracking-wide txt-suave">
-                <th class="px-2 py-1.5">Producto / Bien-Servicio</th>
-                <th class="px-2 py-1.5">Unidad</th>
-                <th class="px-2 py-1.5 text-right">Planeada</th>
-                <th class="px-2 py-1.5 text-right">Ejec. 30/04</th>
-                <th class="px-2 py-1.5 text-blue-600 dark:text-blue-400">Valor estad. 30/06 ✎</th>
-                <th class="px-2 py-1.5 text-center">Eficacia</th>
-                <th class="px-2 py-1.5 text-blue-600 dark:text-blue-400">Justificación / Obs. ✎</th>
-              </tr></thead>
-              <tbody>${filas}</tbody>
-            </table>
-          </div>
-        </div>`;
+        filas.push(filaPA_proy(py));
+        py.productos.forEach(b => filas.push(filaPA_bien(b)));
       });
-      html += `</div></details>`;
     });
-    html += `</div>
+
+    const cuerpo = filas.join('') ||
+      `<tr><td colspan="11" class="celda px-3 py-6 text-center txt-suave">No hay registros para el filtro seleccionado.</td></tr>`;
+
+    $('#contenido').innerHTML = `
+      <div class="panel borde border rounded-xl overflow-hidden">
+        <div class="overflow-x-auto" style="max-height:72vh">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="text-[11px] uppercase tracking-wide" style="background:var(--panel)">
+                <th class="celda px-2 py-2">Nivel</th>
+                <th class="celda px-2 py-2">Código</th>
+                <th class="celda px-2 py-2">Descripción / Producto</th>
+                <th class="celda px-2 py-2">Subsec.</th>
+                <th class="celda px-2 py-2">Unidad</th>
+                <th class="celda px-2 py-2 text-right">Planeada</th>
+                <th class="celda px-2 py-2 text-right">Ejec. 30/04</th>
+                <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Valor 30/06 ✎</th>
+                <th class="celda px-2 py-2 text-center">Eficacia</th>
+                <th class="celda px-2 py-2 text-right">Ppto aj. (M)</th>
+                <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Justificación / Obs. ✎</th>
+              </tr>
+            </thead>
+            <tbody>${cuerpo}</tbody>
+          </table>
+        </div>
+      </div>
       <p class="text-[11px] txt-suave mt-2">✎ columnas editables. La eficacia se calcula automáticamente (Valor 30/06 ÷ Planeada). Valores <b>&lt;30%</b> o <b>&gt;100%</b> requieren justificación. ${sesion.rol==='sub'?'Solo puede editar los productos de <b>'+esc(sesion.sub)+'</b>.':''}</p>`;
-    $('#contenido').innerHTML = html;
   }
 
-  function productoFila(b){
+  // Fila de Programa: encabezado de sección dentro de la tabla
+  function filaPA_prog(pr, nProy){
+    const busca = (pr.cod+' '+pr.desc).toLowerCase();
+    return `<tr data-busca="${esc(busca)}" data-nivel="Programa" class="bg-blue-500/[.06]">
+      <td class="celda px-2 py-2">${badgeNivel('Programa')}</td>
+      <td class="celda px-2 py-2 text-xs font-mono whitespace-nowrap font-semibold">${esc(pr.cod)}</td>
+      <td class="celda px-2 py-2 text-sm font-semibold" colspan="7">${esc(pr.desc)} <span class="txt-suave font-normal text-[11px]">· ${nProy} proyecto(s)</span></td>
+      <td class="celda px-2 py-2 text-right text-xs whitespace-nowrap font-semibold">${fmtMill(pr.pptoAj)}</td>
+      <td class="celda px-2 py-2"></td>
+    </tr>`;
+  }
+
+  // Fila de Proyecto: subtotal de presupuesto y % de ejecución presupuestal
+  function filaPA_proy(py){
+    const pa = parseNum(valTexto('pa',py,'pptoAj')) ?? py.pptoAj;
+    const ej = parseNum(valTexto('pa',py,'ej3006')) ?? py.ej3006;
+    const pejec = (pa && ej!=null) ? (ej/pa*100) : null;
+    const [ptxt,pcls,pbg] = colorPct(pejec);
+    const busca = (py.cod+' '+py.desc+' '+(py.sub||'')).toLowerCase();
+    return `<tr data-busca="${esc(busca)}" data-nivel="Proyecto" class="bg-black/[.02] dark:bg-white/[.04]">
+      <td class="celda px-2 py-1.5">${badgeNivel('Proyecto')}</td>
+      <td class="celda px-2 py-1.5 text-xs font-mono whitespace-nowrap">${esc(py.cod)}</td>
+      <td class="celda px-2 py-1.5 text-sm" colspan="6">
+        <span class="font-medium">${esc(py.desc)}</span>
+        <span class="ml-1 align-middle">${badgeSub(py.sub)}</span>
+      </td>
+      <td class="celda px-2 py-1.5 text-center"><span class="text-[11px] font-semibold px-2 py-0.5 rounded ${pcls} ${pbg}" title="Ejecución presupuestal 30/06">${ptxt}</span></td>
+      <td class="celda px-2 py-1.5 text-right text-xs whitespace-nowrap font-medium">${fmtMill(py.pptoAj)}</td>
+      <td class="celda px-2 py-1.5"></td>
+    </tr>`;
+  }
+
+  // Fila de Producto (BIEN): celdas editables de Valor 30/06 y Justificación
+  function filaPA_bien(b){
     const v = parseNum(valTexto('pa',b,'ej3006'));
     const plan = parseNum(valTexto('pa',b,'plan')) ?? b.plan;
     const ef = (v!=null && plan) ? (v/plan*100) : null;
     const [txt,cls,bg] = colorPct(ef);
     const requiere = (ef!=null && (ef<30 || ef>100));
     const propio = sesion.rol==='admin' || b.sub===sesion.sub;
-    const busca = (b.cod+' '+b.desc+' '+(b.descBPS||'')).toLowerCase();
-    return `<tr data-busca="${esc(busca)}" class="hover:bg-black/[.02] dark:hover:bg-white/[.03] ${propio?'':'opacity-90'}">
+    const busca = (b.cod+' '+b.desc+' '+(b.descBPS||'')+' '+(b.sub||'')).toLowerCase();
+    return `<tr data-busca="${esc(busca)}" data-nivel="BIEN" class="hover:bg-black/[.02] dark:hover:bg-white/[.03] ${propio?'':'opacity-90'}">
+      <td class="celda px-2 py-1.5">${badgeNivel('BIEN')}</td>
+      <td class="celda px-2 py-1.5 text-[10px] font-mono whitespace-nowrap">${esc(b.cod)}</td>
       <td class="celda px-2 py-1.5 text-xs min-w-[230px] max-w-[360px]">
         <div class="font-medium">${esc(b.desc)}</div>
-        <div class="text-[10px] txt-suave font-mono">${esc(b.cod)}</div>
         ${b.descBPS?`<div class="text-[10px] txt-suave mt-0.5 line-clamp-2" title="${esc(b.descBPS)}">${esc(b.descBPS)}</div>`:''}
       </td>
+      <td class="celda px-2 py-1.5">${badgeSub(b.sub)}</td>
       <td class="celda px-2 py-1.5 text-[11px] whitespace-nowrap">${esc(b.unidad||'—')}</td>
       <td class="celda px-2 py-1.5 text-right text-xs whitespace-nowrap">${fmtNum(b.plan)}</td>
       <td class="celda px-2 py-1.5 text-right text-xs txt-suave whitespace-nowrap">${fmtNum(b.ej0204)}</td>
@@ -374,8 +415,20 @@
         <span id="pct-${esc(b.id)}" class="text-xs font-semibold px-2 py-0.5 rounded ${cls} ${bg}">${txt}</span>
         ${requiere?`<div id="req-${esc(b.id)}" class="text-[9px] text-red-500 mt-0.5">justificar</div>`:`<div id="req-${esc(b.id)}"></div>`}
       </td>
+      <td class="celda px-2 py-1.5"></td>
       <td class="celda px-1 py-1 min-w-[220px]">${celdaTxt('pa',b,'justVE','Justificación del valor…')}</td>
     </tr>`;
+  }
+
+  // Filtros combinados (nivel + texto) para la tabla del Plan de Acción
+  function aplicarFiltrosPA(){
+    const niv = $('#f-nivel') ? $('#f-nivel').value : '';
+    const q = ($('#f-busca') ? $('#f-busca').value : '').toLowerCase().trim();
+    $$('#contenido tr[data-busca]').forEach(tr => {
+      const okNiv = !niv || tr.dataset.nivel===niv;
+      const okQ = !q || (tr.dataset.busca||'').includes(q);
+      tr.style.display = (okNiv && okQ) ? '' : 'none';
+    });
   }
 
   /* ===== 7. Edición y guardado ===== */
