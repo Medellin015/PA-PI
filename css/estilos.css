@@ -1,0 +1,63 @@
+  /* ===== Variables de tema ===== */
+  :root{
+    --fondo:#f1f5f9; --fondo2:#e2e8f0; --panel:#ffffff; --texto:#0f172a;
+    --suave:#475569; --borde:#e2e8f0; --acento:#1d4ed8; --acento2:#1e40af;
+  }
+  html.dark{
+    --fondo:#0b1220; --fondo2:#0f172a; --panel:#111c2e; --texto:#e8eefc;
+    --suave:#9fb0cc; --borde:#22304a; --acento:#3b82f6; --acento2:#60a5fa;
+  }
+  body{
+    background:linear-gradient(160deg,var(--fondo),var(--fondo2));
+    color:var(--texto); min-height:100vh;
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+  }
+  .panel{ background:var(--panel); border:1px solid var(--borde); }
+  .borde{ border-color:var(--borde); }
+  .txt-suave{ color:var(--suave); }
+
+  /* ===== Animaciones ===== */
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+  @keyframes slideUp{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
+  @keyframes pop{ 0%{transform:scale(.96)} 100%{transform:scale(1)} }
+  .anim-fade{ animation:fadeIn .35s ease both; }
+  .anim-up{ animation:slideUp .4s cubic-bezier(.2,.7,.3,1) both; }
+  .anim-pop{ animation:pop .18s ease both; }
+
+  /* ===== Scrollbar ===== */
+  ::-webkit-scrollbar{ height:10px; width:10px; }
+  ::-webkit-scrollbar-thumb{ background:#64748b80; border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:#64748b; }
+
+  /* ===== Tablas ===== */
+  table{ border-collapse:separate; border-spacing:0; }
+  thead th{ position:sticky; top:0; z-index:5; }
+  .celda{ border-bottom:1px solid var(--borde); }
+  .col-fija{ position:sticky; left:0; z-index:4; background:var(--panel); }
+
+  /* ===== Inputs editables ===== */
+  .edit{
+    background:transparent; border:1px solid transparent; border-radius:8px;
+    padding:5px 8px; width:100%; color:inherit; transition:.15s; font-size:.84rem;
+  }
+  .edit:hover{ border-color:var(--borde); }
+  .edit:focus{ outline:none; border-color:var(--acento); background:rgba(59,130,246,.08);
+    box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+  .edit-num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .editable-marca{ background:linear-gradient(transparent 70%, rgba(59,130,246,.10) 0); }
+
+  /* ===== Toasts ===== */
+  #toasts{ position:fixed; right:16px; bottom:16px; z-index:90; display:flex; flex-direction:column; gap:8px; }
+  .toast{ background:var(--panel); border:1px solid var(--borde); border-left:4px solid var(--acento);
+    padding:10px 14px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18);
+    font-size:.86rem; animation:slideUp .25s ease both; max-width:320px; }
+  .toast.ok{ border-left-color:#16a34a; }
+  .toast.err{ border-left-color:#dc2626; }
+
+  .tab-activa{ background:var(--acento); color:#fff; box-shadow:0 6px 18px rgba(29,78,216,.35); }
+  details>summary{ list-style:none; cursor:pointer; }
+  details>summary::-webkit-details-marker{ display:none; }
+  .chev{ transition:transform .2s; }
+  details[open] .chev{ transform:rotate(90deg); }
+  #arriba{ position:fixed; right:16px; bottom:74px; z-index:80; opacity:0; pointer-events:none; transition:.25s; }
+  #arriba.ver{ opacity:1; pointer-events:auto; }
