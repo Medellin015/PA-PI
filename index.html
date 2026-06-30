@@ -24,40 +24,10 @@
 </head>
 <body>
 
-<!-- ===================== PANTALLA DE INGRESO ===================== -->
-<div id="pantalla-login" class="fixed inset-0 z-[100] flex items-center justify-center p-4 anim-fade">
-  <div class="panel anim-up w-full max-w-md rounded-2xl shadow-2xl p-7">
-    <div class="flex items-center gap-3 mb-5">
-      <div class="h-12 w-12 rounded-xl flex items-center justify-center text-white text-2xl font-black"
-           style="background:linear-gradient(135deg,var(--acento),var(--acento2))">PC</div>
-      <div>
-        <h1 class="text-lg font-bold leading-tight">Seguimiento Plan de Desarrollo</h1>
-        <p class="text-xs txt-suave">Secretaría de Participación Ciudadana · Corte 30/06/2026</p>
-      </div>
-    </div>
-
-    <label class="text-xs font-semibold txt-suave">Usuario</label>
-    <input id="in-usuario" type="text" placeholder="Escriba su usuario" autocomplete="username" autocapitalize="none" spellcheck="false"
-           class="panel borde w-full mt-1 mb-3 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ring-blue-500/50" />
-
-    <label class="text-xs font-semibold txt-suave">Contraseña</label>
-    <div class="relative mt-1">
-      <input id="in-clave" type="password" placeholder="Ingrese su contraseña" autocomplete="off"
-             class="panel borde w-full rounded-lg px-3 py-2.5 text-sm pr-12 focus:outline-none focus:ring-2 ring-blue-500/50" />
-      <button id="btn-ver-clave" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs txt-suave hover:opacity-80 px-2 py-1">ver</button>
-    </div>
-
-    <p id="login-error" class="text-xs text-red-500 mt-2 h-4"></p>
-
-    <button id="btn-ingresar" class="w-full mt-3 rounded-lg py-2.5 text-sm font-semibold text-white anim-pop"
-            style="background:linear-gradient(135deg,var(--acento),var(--acento2))">Ingresar</button>
-
-    <p id="login-modo" class="text-[11px] txt-suave mt-4 text-center"></p>
-  </div>
-</div>
-
 <!-- ===================== APLICACIÓN ===================== -->
-<div id="app" class="hidden">
+<!-- La app abre directamente en modo Invitado (solo lectura); el rol se elige
+     en el selector de la barra superior y pide contraseña en un modal. -->
+<div id="app">
   <!-- Encabezado -->
   <header class="panel borde sticky top-0 z-40 border-b">
     <div class="max-w-none px-4 py-2.5 flex items-center gap-3">
@@ -69,10 +39,11 @@
       </div>
       <div class="ml-auto flex items-center gap-1.5">
         <span id="badge-modo" class="hidden sm:inline-flex text-[10px] px-2 py-1 rounded-full borde border"></span>
-        <span id="badge-user" class="text-[11px] px-2.5 py-1 rounded-full text-white font-medium" style="background:var(--acento)"></span>
+        <span id="badge-user" class="hidden sm:inline-flex text-[11px] px-2.5 py-1 rounded-full text-white font-medium" style="background:var(--acento)"></span>
+        <span class="text-[11px] txt-suave hidden md:inline">👤</span>
+        <select id="rol-select" title="Cambiar de rol" class="panel borde border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 ring-blue-500/50"></select>
         <button id="btn-exportar" title="Exportar a Excel" class="text-xs px-2.5 py-1.5 rounded-lg borde border hover:bg-black/5 dark:hover:bg-white/5">⤓ Excel</button>
         <button id="btn-tema" title="Tema claro/oscuro" class="text-sm px-2.5 py-1.5 rounded-lg borde border hover:bg-black/5 dark:hover:bg-white/5">◐</button>
-        <button id="btn-salir" title="Cerrar sesión" class="text-xs px-2.5 py-1.5 rounded-lg borde border hover:bg-red-500/10 text-red-500">Salir</button>
       </div>
     </div>
     <!-- Pestañas -->
@@ -98,6 +69,27 @@
 </div>
 
 <button id="arriba" class="panel borde border rounded-full h-10 w-10 shadow-lg text-lg" title="Volver arriba">↑</button>
+
+<!-- ===================== MODAL DE CONTRASEÑA (por rol) ===================== -->
+<div id="modal-clave" class="modal-overlay" style="display:none">
+  <div class="modal panel borde border anim-up">
+    <h3 class="text-base font-bold flex items-center gap-2">🔐 Autenticación</h3>
+    <p class="text-xs txt-suave mt-1">Ingrese la contraseña del rol:</p>
+    <p id="modal-rol" class="text-sm font-semibold mb-3"></p>
+    <div class="relative">
+      <input id="modal-clave-input" type="password" placeholder="Contraseña" autocomplete="new-password"
+             class="panel borde border w-full rounded-lg px-3 py-2.5 text-sm pr-12 focus:outline-none focus:ring-2 ring-blue-500/50" />
+      <button id="modal-ver-clave" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs txt-suave hover:opacity-80 px-2 py-1">ver</button>
+    </div>
+    <p id="modal-error" class="text-xs text-red-500 mt-2 h-4"></p>
+    <div class="modal-actions">
+      <button id="modal-cancelar" class="text-xs px-3 py-2 rounded-lg borde border hover:bg-black/5 dark:hover:bg-white/5">Cancelar</button>
+      <button id="modal-acceder" class="text-xs px-4 py-2 rounded-lg text-white font-semibold"
+              style="background:linear-gradient(135deg,var(--acento),var(--acento2))">Acceder</button>
+    </div>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <!-- ============================================================================
