@@ -111,8 +111,8 @@
 
   /* ===== 3. Reglas de edición por rol ===== */
   const EDIT_ADMIN = {
-    pi: ['nom','fc','metaPlan','m24','l24','m25','l25','m26','l0204','l3006','obs','lider'],
-    pa_bien: ['desc','unidad','plan','ej0204','ej3006','descBPS','justVE'],
+    pi: ['nom','fc','metaPlan','m24','l24','m25','l25','m26','l0204','l3006','obs','evid','lider'],
+    pa_bien: ['desc','unidad','plan','ej0204','ej3006','descBPS','justVE','evid'],
     pa_proy: ['desc','pptoIni','pptoAj','ej0204','ej3006'],
   };
   function esEditable(col, fila, campo){
@@ -122,9 +122,9 @@
       if (col==='pa') return (fila.nivel==='BIEN' ? EDIT_ADMIN.pa_bien : EDIT_ADMIN.pa_proy).includes(campo);
       return false;
     }
-    // Subsecretaría: SOLO Valor estadístico y Observaciones
-    if (col==='pi') return campo==='l3006' || campo==='obs';
-    if (col==='pa') return fila.nivel==='BIEN' && fila.sub===sesion.sub && (campo==='ej3006' || campo==='justVE');
+    // Subsecretaría: Valor estadístico, Observaciones/Justificación y Evidencias NAS
+    if (col==='pi') return campo==='l3006' || campo==='obs' || campo==='evid';
+    if (col==='pa') return fila.nivel==='BIEN' && fila.sub===sesion.sub && (campo==='ej3006' || campo==='justVE' || campo==='evid');
     return false;
   }
 
@@ -247,6 +247,7 @@
         <td class="celda px-1 py-1 w-28">${celdaNum('pi',p,'l3006')}</td>
         <td class="celda px-2 py-1.5 text-center"><span id="pct-${esc(p.id)}" class="text-xs font-semibold px-2 py-0.5 rounded ${cls} ${bg}">${txt}</span></td>
         <td class="celda px-1 py-1 min-w-[220px]">${celdaTxt('pi',p,'obs','Observaciones del avance…')}</td>
+        <td class="celda px-1 py-1 min-w-[200px]">${celdaTxt('pi',p,'evid','Enlace o ruta NAS…')}</td>
         <td class="celda px-2 py-1.5 text-[11px] txt-suave whitespace-nowrap">${esc(p.lider||'—')}</td>
       </tr>`;
     }).join('');
@@ -266,6 +267,7 @@
                 <th class="celda px-2 py-2 ${'text-blue-600 dark:text-blue-400'}">Valor 30/06 ✎</th>
                 <th class="celda px-2 py-2 text-center">% Avance</th>
                 <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Observaciones ✎</th>
+                <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Evidencias NAS ✎</th>
                 <th class="celda px-2 py-2">Líder</th>
               </tr>
             </thead>
@@ -330,7 +332,7 @@
     });
 
     const cuerpo = filas.join('') ||
-      `<tr><td colspan="11" class="celda px-3 py-6 text-center txt-suave">No hay registros para el filtro seleccionado.</td></tr>`;
+      `<tr><td colspan="12" class="celda px-3 py-6 text-center txt-suave">No hay registros para el filtro seleccionado.</td></tr>`;
 
     $('#contenido').innerHTML = `
       <div class="panel borde border rounded-xl overflow-hidden">
@@ -349,6 +351,7 @@
                 <th class="celda px-2 py-2 text-center">Eficacia</th>
                 <th class="celda px-2 py-2 text-right">Ppto aj. (M)</th>
                 <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Justificación / Obs. ✎</th>
+                <th class="celda px-2 py-2 text-blue-600 dark:text-blue-400">Evidencias NAS ✎</th>
               </tr>
             </thead>
             <tbody>${cuerpo}</tbody>
@@ -366,6 +369,7 @@
       <td class="celda px-2 py-2 text-xs font-mono whitespace-nowrap font-semibold">${esc(pr.cod)}</td>
       <td class="celda px-2 py-2 text-sm font-semibold" colspan="7">${esc(pr.desc)} <span class="txt-suave font-normal text-[11px]">· ${nProy} proyecto(s)</span></td>
       <td class="celda px-2 py-2 text-right text-xs whitespace-nowrap font-semibold">${fmtMill(pr.pptoAj)}</td>
+      <td class="celda px-2 py-2"></td>
       <td class="celda px-2 py-2"></td>
     </tr>`;
   }
@@ -386,6 +390,7 @@
       </td>
       <td class="celda px-2 py-1.5 text-center"><span class="text-[11px] font-semibold px-2 py-0.5 rounded ${pcls} ${pbg}" title="Ejecución presupuestal 30/06">${ptxt}</span></td>
       <td class="celda px-2 py-1.5 text-right text-xs whitespace-nowrap font-medium">${fmtMill(py.pptoAj)}</td>
+      <td class="celda px-2 py-1.5"></td>
       <td class="celda px-2 py-1.5"></td>
     </tr>`;
   }
@@ -417,6 +422,7 @@
       </td>
       <td class="celda px-2 py-1.5"></td>
       <td class="celda px-1 py-1 min-w-[220px]">${celdaTxt('pa',b,'justVE','Justificación del valor…')}</td>
+      <td class="celda px-1 py-1 min-w-[200px]">${celdaTxt('pa',b,'evid','Enlace o ruta NAS…')}</td>
     </tr>`;
   }
 
@@ -484,24 +490,24 @@
 
   /* ===== 8. Exportar a Excel (plan B: CSV) ===== */
   function datosPIparaExport(){
-    const filas = [['Código','Indicador','Tipo','FC','Meta Plan','Meta 2024','Logro 2024','Meta 2025','Logro 2025','Meta 2026','Logro 30/04/2026','Valor 30/06/2026','% Avance','Observaciones','Líder']];
+    const filas = [['Código','Indicador','Tipo','FC','Meta Plan','Meta 2024','Logro 2024','Meta 2025','Logro 2025','Meta 2026','Logro 30/04/2026','Valor 30/06/2026','% Avance','Observaciones','Evidencias NAS','Líder']];
     PI_DATA.forEach(p => {
       const v = parseNum(valTexto('pi',p,'l3006'));
       const pct = (v!=null && p.m26) ? +(v/p.m26*100).toFixed(2) : '';
-      filas.push([p.cod,p.nom,p.tipo,p.fc, p.metaPlan,p.m24,p.l24,p.m25,p.l25,p.m26, p.l0204, (v==null?'':v), pct, valTexto('pi',p,'obs')||'', p.lider||'']);
+      filas.push([p.cod,p.nom,p.tipo,p.fc, p.metaPlan,p.m24,p.l24,p.m25,p.l25,p.m26, p.l0204, (v==null?'':v), pct, valTexto('pi',p,'obs')||'', valTexto('pi',p,'evid')||'', p.lider||'']);
     });
     return filas;
   }
   function datosPAparaExport(){
-    const filas = [['Nivel','Código','Descripción','Subsecretaría','Unidad','Cant. Planeada','Ejec. 30/04','Valor 30/06','Eficacia %','Ppto Ajustado (M)','Justificación/Obs.']];
+    const filas = [['Nivel','Código','Descripción','Subsecretaría','Unidad','Cant. Planeada','Ejec. 30/04','Valor 30/06','Eficacia %','Ppto Ajustado (M)','Justificación/Obs.','Evidencias NAS']];
     PA_DATA.forEach(f => {
       if (f.nivel==='BIEN'){
         const v = parseNum(valTexto('pa',f,'ej3006'));
         const plan = f.plan;
         const ef = (v!=null && plan)? +(v/plan*100).toFixed(2):'';
-        filas.push([f.nivel,f.cod,f.desc,f.sub,f.unidad,f.plan,f.ej0204,(v==null?'':v),ef,'',valTexto('pa',f,'justVE')||'']);
+        filas.push([f.nivel,f.cod,f.desc,f.sub,f.unidad,f.plan,f.ej0204,(v==null?'':v),ef,'',valTexto('pa',f,'justVE')||'',valTexto('pa',f,'evid')||'']);
       } else if (['Pilar','Componente','Programa','Proyecto'].includes(f.nivel)){
-        filas.push([f.nivel,f.cod,f.desc,f.sub||'', '','','','','', (f.pptoAj!=null?f.pptoAj:''),'']);
+        filas.push([f.nivel,f.cod,f.desc,f.sub||'', '','','','','', (f.pptoAj!=null?f.pptoAj:''),'','']);
       }
     });
     return filas;
@@ -515,8 +521,8 @@
       const ws1 = XLSX.utils.aoa_to_sheet(piF);
       const ws2 = XLSX.utils.aoa_to_sheet(paF);
       // anchos básicos
-      ws1['!cols'] = [{wch:10},{wch:48},{wch:11},{wch:5},{wch:10},{wch:9},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:12},{wch:9},{wch:40},{wch:24}];
-      ws2['!cols'] = [{wch:11},{wch:10},{wch:46},{wch:24},{wch:10},{wch:11},{wch:10},{wch:11},{wch:9},{wch:14},{wch:44}];
+      ws1['!cols'] = [{wch:10},{wch:48},{wch:11},{wch:5},{wch:10},{wch:9},{wch:9},{wch:9},{wch:9},{wch:9},{wch:12},{wch:12},{wch:9},{wch:40},{wch:30},{wch:24}];
+      ws2['!cols'] = [{wch:11},{wch:10},{wch:46},{wch:24},{wch:10},{wch:11},{wch:10},{wch:11},{wch:9},{wch:14},{wch:44},{wch:30}];
       // encabezados en negrita
       [ws1,ws2].forEach(ws => {
         const range = XLSX.utils.decode_range(ws['!ref']);
