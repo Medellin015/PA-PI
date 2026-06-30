@@ -33,26 +33,30 @@ El orden de carga de los scripts en `index.html` es importante:
    hosting estático.
 2. Seleccionar el usuario, escribir la contraseña y pulsar **Ingresar**.
 
-## Usuarios y contraseñas
+## Roles y contraseñas
 
-En la pantalla de ingreso **se escribe el usuario** (no hay lista desplegable, así
-no se expone quiénes son los usuarios). Se acepta el usuario corto o el nombre
-completo del rol, sin distinguir mayúsculas/minúsculas ni espacios al inicio/fin;
-la contraseña sí distingue mayúsculas (y se ignoran sus espacios al inicio/fin).
+**No hay pantalla de ingreso.** La aplicación abre directamente en modo
+**Invitado (solo lectura)**. Para editar, se elige un rol en el **selector de la
+barra superior**; al escoger un rol con permisos aparece un **modal que pide la
+contraseña** (si se cancela o es incorrecta, se mantiene el modo solo lectura).
 
 Definidos en `js/datos.js` (`USUARIOS_DEFAULT`).
 
-| Usuario (lo que se escribe) | Contraseña      | Rol / Subsecretaría                            |
-|-----------------------------|-----------------|------------------------------------------------|
-| `admin`                     | `EquipoContrat` | Administrador (edita todo)                     |
-| `formacion`                 | `Formacion`     | Formación Ciudadana                            |
-| `organizacion`              | `OrgSocial`     | Organización Social                            |
-| `planeacion`                | `LocalPP26`     | Planeación Local y Presupuesto Participativo   |
-| `unidad`                    | `UnidadAdmin`   | Unidad Administrativa                          |
+| Rol (en el selector)     | Contraseña      | Permisos                                           |
+|--------------------------|-----------------|----------------------------------------------------|
+| Invitado (solo lectura)  | —               | Solo ver (sin contraseña)                          |
+| Equipo de Contratación   | `EquipoContrat` | Edita todo                                         |
+| Subsec. Formación        | `Formacion`     | Edita los productos de Formación Ciudadana         |
+| Subsec. Organización     | `OrgSocial`     | Edita los productos de Organización Social         |
+| Subsec. Planeación       | `LocalPP26`     | Edita los de Planeación Local y PP                 |
+| Unidad Administrativa    | `UnidadAdmin`   | Edita los de Unidad Administrativa                 |
+
+La contraseña distingue mayúsculas/minúsculas (se ignoran espacios al inicio/fin).
+El rol elegido se recuerda al recargar (mientras dure la pestaña).
 
 > Estas credenciales son del lado del cliente (no son un mecanismo de seguridad
 > robusto): cualquiera con acceso al archivo puede leerlas. Cámbielas en
-> `js/datos.js` según sea necesario (campos `user` y `clave`).
+> `js/datos.js` según sea necesario (campo `clave`).
 
 ## Conectar Firebase (opcional)
 

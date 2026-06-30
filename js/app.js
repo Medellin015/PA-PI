@@ -1,7 +1,7 @@
 'use strict';
 (function(){
   /* ===== 1. Estado y utilidades ===== */
-  let sesion = null;
+  let sesion = { usuario:null, rol:'invitado', sub:null, nombre:'Invitado' };
   let vista = 'indicativo';
   let filtroSubPA = 'Todas';
   const estado = { pi:{}, pa:{} };          // parches cargados/editados
@@ -41,86 +41,133 @@
     return [nfNum.format(p)+'%','text-sky-600 dark:text-sky-400','bg-sky-500/10'];
   }
 
-  /* ===== 2. Sesión / ingreso ===== */
-  // Resuelve el usuario escrito a su registro. Acepta el alias corto
-  // (p. ej. "admin") o el nombre completo, sin distinguir mayúsculas/espacios.
-  function buscarUsuario(txt){
-    const t = (txt||'').trim().toLowerCase();
-    if (!t) return null;
-    for (const nombre in USUARIOS_DEFAULT){
-      const reg = USUARIOS_DEFAULT[nombre];
-      if ((reg.user||'').toLowerCase() === t || nombre.toLowerCase() === t){
-        return { nombre, reg };
-      }
+  /* ===== 2. Sesión y roles =====
+     No hay pantalla de ingreso: la app abre en modo Invitado (solo lectura).
+     El rol se elige en el selector de la barra superior; al escoger un rol con
+     permisos se pide la contraseña en un modal (si se cancela, se revierte). */
+  const ROL_INVITADO = '__invitado__';
+  let claveObjetivo = null;        // clave (nombre) de USUARIOS_DEFAULT por verificar
+  let rolAnterior = ROL_INVITADO;  // para revertir el selector si se cancela
+
+  function pintarSelectorRol(){
+    const sel = $('#rol-select');
+    if (!sel) return;
+    const opts = [`<option value="${ROL_INVITADO}">Invitado (solo lectura)</option>`]
+      .concat(Object.keys(USUARIOS_DEFAULT).map(n =>
+        `<option value="${esc(n)}">${esc(USUARIOS_DEFAULT[n].label || USUARIOS_DEFAULT[n].nombre || n)}</option>`));
+    sel.innerHTML = opts.join('');
+    sel.onchange = manejarCambioRol;
+    actualizarBadges();
+  }
+
+  function manejarCambioRol(e){
+    const val = e.target.value;
+    if (val===ROL_INVITADO){
+      aplicarSesion({ rol:'invitado', sub:null, nombre:'Invitado' }, null);
+      toast('Modo solo lectura', 'ok');
+      return;
     }
-    return null;
+    abrirModalClave(val);
   }
 
-  function pintarLogin(){
-    // Sin desplegable: el usuario se escribe (no se expone la lista de usuarios).
-    $('#btn-ver-clave').onclick = () => {
-      const i = $('#in-clave'); i.type = i.type==='password' ? 'text':'password';
-      $('#btn-ver-clave').textContent = i.type==='password' ? 'ver':'ocultar';
-    };
-    const intentar = () => {
-      const hit = buscarUsuario($('#in-usuario').value);
-      // .trim(): evita el fallo de ingreso por espacios al inicio/fin
-      // (muy común al copiar/pegar o al autocompletar la contraseña).
-      const c = $('#in-clave').value.trim();
-      if (!hit || hit.reg.clave !== c){
-        $('#login-error').textContent = 'Usuario o contraseña incorrectos.';
-        $('#in-clave').classList.add('ring-2','ring-red-500');
-        setTimeout(()=>$('#in-clave').classList.remove('ring-2','ring-red-500'), 1200);
-        return;
-      }
-      const reg = hit.reg;
-      sesion = { usuario:hit.nombre, rol:reg.rol, sub:reg.sub, nombre:reg.nombre };
-      sessionStorage.setItem('sesionPC', JSON.stringify(sesion));
-      iniciarApp();
-    };
-    $('#btn-ingresar').onclick = intentar;
-    $('#in-usuario').addEventListener('keydown', e => { if (e.key==='Enter') intentar(); });
-    $('#in-clave').addEventListener('keydown', e => { if (e.key==='Enter') intentar(); });
+  function aplicarSesion(s, usuarioKey){
+    sesion = { usuario: usuarioKey || null, rol:s.rol, sub:s.sub, nombre:s.nombre };
+    if (sesion.rol==='invitado') sessionStorage.removeItem('sesionPC');
+    else sessionStorage.setItem('sesionPC', JSON.stringify(sesion));
+    rolAnterior = sesion.usuario || ROL_INVITADO;
+    filtroSubPA = sesion.rol==='sub' && sesion.sub ? sesion.sub : 'Todas';
+    actualizarBadges();
+    render();
   }
 
+  function actualizarBadges(){
+    const sel = $('#rol-select');
+    if (sel) sel.value = (sesion.rol==='invitado') ? ROL_INVITADO : (sesion.usuario || ROL_INVITADO);
+    const bu = $('#badge-user');
+    if (bu){
+      bu.textContent = sesion.rol==='invitado' ? 'Solo lectura'
+        : (sesion.rol==='admin' ? 'Edición total' : 'Edita: '+(sesion.sub||sesion.nombre));
+      bu.classList.toggle('opacity-60', sesion.rol==='invitado');
+    }
+  }
+
+  /* --- Modal de contraseña --- */
+  function abrirModalClave(usuarioKey){
+    claveObjetivo = usuarioKey;
+    const reg = USUARIOS_DEFAULT[usuarioKey];
+    $('#modal-rol').textContent = reg ? (reg.label || reg.nombre) : usuarioKey;
+    const inp = $('#modal-clave-input');
+    inp.type = 'password'; inp.value = '';
+    $('#modal-ver-clave').textContent = 'ver';
+    $('#modal-error').textContent = '';
+    $('#modal-clave').style.display = 'flex';
+    setTimeout(()=>inp.focus(), 50);
+  }
+  function cerrarModalClave(revertir){
+    $('#modal-clave').style.display = 'none';
+    claveObjetivo = null;
+    if (revertir){ const sel=$('#rol-select'); if (sel) sel.value = rolAnterior; }
+  }
+  function verificarClave(){
+    const reg = USUARIOS_DEFAULT[claveObjetivo];
+    const c = $('#modal-clave-input').value.trim();
+    if (!reg || reg.clave !== c){
+      $('#modal-error').textContent = 'Contraseña incorrecta.';
+      const inp = $('#modal-clave-input');
+      inp.classList.add('ring-2','ring-red-500');
+      setTimeout(()=>inp.classList.remove('ring-2','ring-red-500'), 1200);
+      return;
+    }
+    const key = claveObjetivo;
+    $('#modal-clave').style.display = 'none';
+    claveObjetivo = null;
+    aplicarSesion({ rol:reg.rol, sub:reg.sub, nombre:reg.nombre }, key);
+    toast('Sesión: '+(reg.label || reg.nombre), 'ok');
+  }
+  function enlazarModalClave(){
+    $('#modal-acceder').onclick = verificarClave;
+    $('#modal-cancelar').onclick = () => cerrarModalClave(true);
+    $('#modal-ver-clave').onclick = () => {
+      const i = $('#modal-clave-input'); i.type = i.type==='password' ? 'text':'password';
+      $('#modal-ver-clave').textContent = i.type==='password' ? 'ver':'ocultar';
+    };
+    $('#modal-clave-input').addEventListener('keydown', e => {
+      if (e.key==='Enter') verificarClave();
+      else if (e.key==='Escape') cerrarModalClave(true);
+    });
+    $('#modal-clave').addEventListener('click', e => { if (e.target.id==='modal-clave') cerrarModalClave(true); });
+  }
+
+  // Configuración única de la app (visible desde el inicio); idempotente.
+  let appLista = false;
   async function iniciarApp(){
-    await window.DB.init();           // idempotente: fija DB.modo aunque el login sea muy rápido
-    $('#pantalla-login').classList.add('hidden');
-    $('#app').classList.remove('hidden');
-
-    // badge usuario + modo
-    $('#badge-user').textContent = sesion.rol==='admin' ? 'Administrador' : (sesion.sub||sesion.nombre);
-    const modo = window.DB.modo;
+    await window.DB.init();
     const bm = $('#badge-modo');
-    bm.classList.remove('hidden');
-    if (modo==='firebase'){ bm.textContent='● Conectado (Firebase)'; bm.classList.add('text-green-600'); }
-    else { bm.textContent='● Modo local (este navegador)'; bm.classList.add('text-amber-500'); }
+    if (bm){
+      bm.classList.remove('hidden');
+      if (window.DB.modo==='firebase'){ bm.textContent='● Conectado (Firebase)'; bm.classList.add('text-green-600'); }
+      else { bm.textContent='● Modo local (este navegador)'; bm.classList.add('text-amber-500'); }
+    }
 
-    // filtro por defecto: la subsecretaría del usuario
     filtroSubPA = sesion.rol==='sub' && sesion.sub ? sesion.sub : 'Todas';
 
-    // cargar parches
     try{
       const datos = await window.DB.cargarTodo();
       estado.pi = datos.pi || {}; estado.pa = datos.pa || {};
     }catch(e){ console.warn(e); }
 
-    // tiempo real (si Firebase)
-    window.DB.suscribir('pi', m => { estado.pi = m; if (vista==='indicativo') render(); });
-    window.DB.suscribir('pa', m => { estado.pa = m; if (vista==='accion') render(); });
-
-    // pestañas
-    $$('.btn-tab').forEach(b => b.onclick = () => { vista = b.dataset.vista; render(); });
-    $('#btn-tema').onclick = alternarTema;
-    $('#btn-salir').onclick = salir;
-    $('#btn-exportar').onclick = exportarExcel;
-
+    if (!appLista){
+      appLista = true;
+      window.DB.suscribir('pi', m => { estado.pi = m; if (vista==='indicativo') render(); });
+      window.DB.suscribir('pa', m => { estado.pa = m; if (vista==='accion') render(); });
+      $$('.btn-tab').forEach(b => b.onclick = () => { vista = b.dataset.vista; render(); });
+      $('#btn-tema').onclick = alternarTema;
+      $('#btn-exportar').onclick = exportarExcel;
+      pintarSelectorRol();
+      enlazarModalClave();
+    }
+    actualizarBadges();
     render();
-  }
-
-  function salir(){
-    sessionStorage.removeItem('sesionPC');
-    location.reload();
   }
 
   /* ===== 3. Reglas de edición por rol ===== */
@@ -130,7 +177,7 @@
     pa_proy: ['desc','pptoIni','pptoAj','ej0204','ej3006'],
   };
   function esEditable(col, fila, campo){
-    if (!sesion) return false;
+    if (!sesion || sesion.rol==='invitado') return false;
     if (sesion.rol==='admin'){
       if (col==='pi') return EDIT_ADMIN.pi.includes(campo);
       if (col==='pa') return (fila.nivel==='BIEN' ? EDIT_ADMIN.pa_bien : EDIT_ADMIN.pa_proy).includes(campo);
@@ -588,14 +635,10 @@
     if (arrancado) return; arrancado = true;   // arranque() se invoca por DOMContentLoaded y por el chequeo inmediato
     // tema guardado
     if (localStorage.getItem('tema')==='dark') document.documentElement.classList.add('dark');
-    pintarLogin();
-    await window.DB.init();
-    $('#login-modo').textContent = window.DB.modo==='firebase'
-      ? 'Conectado a Firebase: los datos se comparten entre usuarios.'
-      : 'Modo local (este navegador). Para compartir datos entre usuarios, configure Firebase en el archivo.';
-    // sesión persistida
+    // sesión persistida (rol con permisos) o Invitado por defecto
     const guardada = sessionStorage.getItem('sesionPC');
-    if (guardada){ try{ sesion = JSON.parse(guardada); iniciarApp(); }catch(e){} }
+    if (guardada){ try{ const s = JSON.parse(guardada); if (s && s.rol) sesion = s; }catch(e){} }
+    await iniciarApp();
   }
   window.addEventListener('DOMContentLoaded', arranque);
   // por si DOMContentLoaded ya pasó (scripts defer)
