@@ -35,20 +35,24 @@ El orden de carga de los scripts en `index.html` es importante:
 
 ## Usuarios y contraseñas
 
-Definidos en `js/datos.js` (`USUARIOS_DEFAULT`). Las contraseñas distinguen
-mayúsculas/minúsculas; los espacios al inicio o al final se ignoran.
+En la pantalla de ingreso **se escribe el usuario** (no hay lista desplegable, así
+no se expone quiénes son los usuarios). Se acepta el usuario corto o el nombre
+completo del rol, sin distinguir mayúsculas/minúsculas ni espacios al inicio/fin;
+la contraseña sí distingue mayúsculas (y se ignoran sus espacios al inicio/fin).
 
-| Usuario                                                  | Contraseña      | Rol           |
-|----------------------------------------------------------|-----------------|---------------|
-| Administrador                                            | `EquipoContrat` | Edita todo    |
-| Subsecretaría de Formación y Participación Ciudadana     | `Formacion`     | Su subsecretaría |
-| Subsecretaría de Organización Social                     | `OrgSocial`     | Su subsecretaría |
-| Subsecretaria de Planeación Local y PP                   | `LocalPP26`     | Su subsecretaría |
-| Unidad Administrativa                                    | `UnidadAdmin`   | Su subsecretaría |
+Definidos en `js/datos.js` (`USUARIOS_DEFAULT`).
+
+| Usuario (lo que se escribe) | Contraseña      | Rol / Subsecretaría                            |
+|-----------------------------|-----------------|------------------------------------------------|
+| `admin`                     | `EquipoContrat` | Administrador (edita todo)                     |
+| `formacion`                 | `Formacion`     | Formación Ciudadana                            |
+| `organizacion`              | `OrgSocial`     | Organización Social                            |
+| `planeacion`                | `LocalPP26`     | Planeación Local y Presupuesto Participativo   |
+| `unidad`                    | `UnidadAdmin`   | Unidad Administrativa                          |
 
 > Estas credenciales son del lado del cliente (no son un mecanismo de seguridad
 > robusto): cualquiera con acceso al archivo puede leerlas. Cámbielas en
-> `js/datos.js` según sea necesario.
+> `js/datos.js` según sea necesario (campos `user` y `clave`).
 
 ## Conectar Firebase (opcional)
 

@@ -42,30 +42,44 @@
   }
 
   /* ===== 2. Sesión / ingreso ===== */
+  // Resuelve el usuario escrito a su registro. Acepta el alias corto
+  // (p. ej. "admin") o el nombre completo, sin distinguir mayúsculas/espacios.
+  function buscarUsuario(txt){
+    const t = (txt||'').trim().toLowerCase();
+    if (!t) return null;
+    for (const nombre in USUARIOS_DEFAULT){
+      const reg = USUARIOS_DEFAULT[nombre];
+      if ((reg.user||'').toLowerCase() === t || nombre.toLowerCase() === t){
+        return { nombre, reg };
+      }
+    }
+    return null;
+  }
+
   function pintarLogin(){
-    const sel = $('#in-usuario');
-    sel.innerHTML = Object.keys(USUARIOS_DEFAULT).map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+    // Sin desplegable: el usuario se escribe (no se expone la lista de usuarios).
     $('#btn-ver-clave').onclick = () => {
       const i = $('#in-clave'); i.type = i.type==='password' ? 'text':'password';
       $('#btn-ver-clave').textContent = i.type==='password' ? 'ver':'ocultar';
     };
     const intentar = () => {
-      const u = $('#in-usuario').value;
+      const hit = buscarUsuario($('#in-usuario').value);
       // .trim(): evita el fallo de ingreso por espacios al inicio/fin
       // (muy común al copiar/pegar o al autocompletar la contraseña).
       const c = $('#in-clave').value.trim();
-      const reg = USUARIOS_DEFAULT[u];
-      if (!reg || reg.clave !== c){
+      if (!hit || hit.reg.clave !== c){
         $('#login-error').textContent = 'Usuario o contraseña incorrectos.';
         $('#in-clave').classList.add('ring-2','ring-red-500');
         setTimeout(()=>$('#in-clave').classList.remove('ring-2','ring-red-500'), 1200);
         return;
       }
-      sesion = { usuario:u, rol:reg.rol, sub:reg.sub, nombre:reg.nombre };
+      const reg = hit.reg;
+      sesion = { usuario:hit.nombre, rol:reg.rol, sub:reg.sub, nombre:reg.nombre };
       sessionStorage.setItem('sesionPC', JSON.stringify(sesion));
       iniciarApp();
     };
     $('#btn-ingresar').onclick = intentar;
+    $('#in-usuario').addEventListener('keydown', e => { if (e.key==='Enter') intentar(); });
     $('#in-clave').addEventListener('keydown', e => { if (e.key==='Enter') intentar(); });
   }
 
