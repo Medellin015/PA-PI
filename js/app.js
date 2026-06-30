@@ -455,7 +455,7 @@
       inp.addEventListener('change', () => guardarCampo(inp));
     });
   }
-  function autoAltura(t){ t.style.height='auto'; t.style.height=(t.scrollHeight)+'px'; }
+  function autoAltura(t){ t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
 
   function recalcFila(inp){
     const col = inp.dataset.col, id = inp.dataset.id, campo = inp.dataset.campo;

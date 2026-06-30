@@ -7,6 +7,8 @@
     --fondo:#0b1220; --fondo2:#0f172a; --panel:#111c2e; --texto:#e8eefc;
     --suave:#9fb0cc; --borde:#22304a; --acento:#3b82f6; --acento2:#60a5fa;
   }
+  /* Tipografía base un poco más grande (escala todo el texto en rem) */
+  html{ font-size:17px; }
   body{
     background:linear-gradient(160deg,var(--fondo),var(--fondo2));
     color:var(--texto); min-height:100vh;
@@ -38,8 +40,10 @@
   /* ===== Inputs editables ===== */
   .edit{
     background:transparent; border:1px solid transparent; border-radius:8px;
-    padding:5px 8px; width:100%; color:inherit; transition:.15s; font-size:.84rem;
+    padding:5px 8px; width:100%; color:inherit; transition:.15s; font-size:.9rem;
+    resize:none;            /* sin el agarre de redimensionar en la esquina */
   }
+  textarea.edit{ overflow:hidden; }  /* sin barra de desplazamiento (la altura se ajusta sola) */
   .edit:hover{ border-color:var(--borde); }
   .edit:focus{ outline:none; border-color:var(--acento); background:rgba(59,130,246,.08);
     box-shadow:0 0 0 3px rgba(59,130,246,.15); }
