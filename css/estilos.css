@@ -1,22 +1,70 @@
+  /* ============================================================
+     Estilos de la aplicación — diseño renovado.
+     Todos los selectores que consume app.js (.panel, .borde, .btn-tab,
+     .tab-activa, .edit, .celda, .col-fija, .toast, .tb-*, #arriba, …)
+     se conservan; solo cambia su presentación.
+     ============================================================ */
+
   /* ===== Variables de tema ===== */
   :root{
-    --fondo:#f1f5f9; --fondo2:#e2e8f0; --panel:#ffffff; --texto:#0f172a;
-    --suave:#475569; --borde:#e2e8f0; --acento:#1d4ed8; --acento2:#1e40af;
+    --fondo:#eef2f8; --fondo2:#e3e9f3; --panel:#ffffff; --texto:#0f172a;
+    --suave:#526079; --borde:#e3e8f0; --acento:#2563eb; --acento2:#1e40af;
+    --sombra-1:0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.05);
+    --sombra-2:0 10px 30px rgba(15,23,42,.12);
   }
   html.dark{
-    --fondo:#0b1220; --fondo2:#0f172a; --panel:#111c2e; --texto:#e8eefc;
-    --suave:#9fb0cc; --borde:#22304a; --acento:#3b82f6; --acento2:#60a5fa;
+    --fondo:#0a1120; --fondo2:#0e1729; --panel:#111c30; --texto:#e8eefc;
+    --suave:#9db0d0; --borde:#24334f; --acento:#3b82f6; --acento2:#60a5fa;
+    --sombra-1:0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
+    --sombra-2:0 12px 32px rgba(0,0,0,.45);
   }
+
+  /* ===== Base ===== */
   /* Tipografía base más grande (escala todo el texto en rem) */
   html{ font-size:20px; }
+  @media (prefers-reduced-motion: no-preference){ html{ scroll-behavior:smooth; } }
   body{
-    background:linear-gradient(160deg,var(--fondo),var(--fondo2));
+    background:
+      radial-gradient(1100px 520px at 85% -10%, color-mix(in srgb, var(--acento) 9%, transparent), transparent 60%),
+      linear-gradient(160deg,var(--fondo),var(--fondo2));
+    background-attachment:fixed;
     color:var(--texto); min-height:100vh;
-    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+    font-family:'Inter','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   }
+  ::selection{ background:color-mix(in srgb, var(--acento) 25%, transparent); }
   .panel{ background:var(--panel); border:1px solid var(--borde); }
   .borde{ border-color:var(--borde); }
   .txt-suave{ color:var(--suave); }
+
+  /* Controles: transición uniforme y foco visible accesible */
+  button, select, input, textarea{
+    transition:background-color .15s ease, border-color .15s ease, color .15s ease,
+      box-shadow .15s ease, transform .15s ease, opacity .15s ease;
+  }
+  button:active{ transform:scale(.97); }
+  button:focus-visible, select:focus-visible, a:focus-visible{
+    outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 40%, transparent);
+  }
+
+  /* ===== Encabezado (sticky, translúcido con desenfoque) ===== */
+  header.panel{
+    background:color-mix(in srgb, var(--panel) 82%, transparent);
+    -webkit-backdrop-filter:blur(12px) saturate(1.4);
+    backdrop-filter:blur(12px) saturate(1.4);
+    box-shadow:var(--sombra-1);
+  }
+  .logo-pc{ box-shadow:0 4px 14px color-mix(in srgb, var(--acento) 45%, transparent); }
+
+  /* Pestañas de navegación */
+  .btn-tab{ color:var(--suave); }
+  .btn-tab:not(.tab-activa):hover,
+  .tb-toggle:not(.tab-activa):hover{ color:var(--texto); background:color-mix(in srgb, var(--suave) 12%, transparent); }
+  .tab-activa{
+    background:linear-gradient(135deg,var(--acento),var(--acento2)); color:#fff !important;
+    border-color:transparent;
+    box-shadow:0 6px 18px color-mix(in srgb, var(--acento) 35%, transparent);
+  }
 
   /* ===== Animaciones ===== */
   @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
@@ -27,15 +75,34 @@
   .anim-pop{ animation:pop .18s ease both; }
 
   /* ===== Scrollbar ===== */
-  ::-webkit-scrollbar{ height:10px; width:10px; }
-  ::-webkit-scrollbar-thumb{ background:#64748b80; border-radius:8px; }
-  ::-webkit-scrollbar-thumb:hover{ background:#64748b; }
+  ::-webkit-scrollbar{ height:8px; width:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:color-mix(in srgb, var(--suave) 45%, transparent); border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--suave); }
 
   /* ===== Tablas ===== */
   table{ border-collapse:separate; border-spacing:0; }
-  thead th{ position:sticky; top:0; z-index:5; }
+  thead th{
+    position:sticky; top:0; z-index:5; background:var(--panel);
+    font-weight:600; color:var(--suave);
+    box-shadow:inset 0 -2px 0 var(--borde);
+  }
   .celda{ border-bottom:1px solid var(--borde); }
   .col-fija{ position:sticky; left:0; z-index:4; background:var(--panel); }
+  /* Contenedor de tabla con sombra suave */
+  #contenido > .panel{ box-shadow:var(--sombra-1); }
+  /* Zebra sutil en Plan Indicativo (filas con data-tipo) y hover unificado.
+     La col-fija necesita fondo OPACO (va pegada sobre el scroll horizontal),
+     por eso mezcla el mismo tinte con --panel en vez de usar transparencia. */
+  #contenido tbody tr[data-tipo]:nth-child(even){ background:color-mix(in srgb, var(--suave) 6%, transparent); }
+  #contenido tbody tr[data-tipo]:nth-child(even) .col-fija{ background:color-mix(in srgb, var(--suave) 6%, var(--panel)); }
+  #contenido tbody tr[data-tipo]:hover,
+  #contenido tbody tr[data-nivel="BIEN"]:hover{ background:color-mix(in srgb, var(--acento) 7%, transparent); }
+  #contenido tbody tr[data-tipo]:hover .col-fija{ background:color-mix(in srgb, var(--acento) 7%, var(--panel)); }
+
+  /* ===== Tarjetas de resumen (KPIs) ===== */
+  #resumen > div{ box-shadow:var(--sombra-1); transition:transform .15s ease, box-shadow .15s ease; }
+  #resumen > div:hover{ transform:translateY(-2px); box-shadow:var(--sombra-2); }
 
   /* ===== Inputs editables ===== */
   .edit{
@@ -44,30 +111,44 @@
     resize:none;            /* sin el agarre de redimensionar en la esquina */
   }
   textarea.edit{ overflow:hidden; }  /* sin barra de desplazamiento (la altura se ajusta sola) */
-  .edit:hover{ border-color:var(--borde); }
-  .edit:focus{ outline:none; border-color:var(--acento); background:rgba(59,130,246,.08);
-    box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+  .edit:hover{ border-color:var(--borde); background:color-mix(in srgb, var(--suave) 6%, transparent); }
+  .edit:focus{ outline:none; border-color:var(--acento);
+    background:color-mix(in srgb, var(--acento) 8%, var(--panel));
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 18%, transparent); }
   .edit-num{ text-align:right; font-variant-numeric:tabular-nums; }
-  .editable-marca{ background:linear-gradient(transparent 70%, rgba(59,130,246,.10) 0); }
+  .editable-marca{ background:linear-gradient(transparent 70%, color-mix(in srgb, var(--acento) 10%, transparent) 0); }
 
   /* ===== Toasts ===== */
   #toasts{ position:fixed; right:16px; bottom:16px; z-index:90; display:flex; flex-direction:column; gap:8px; }
-  .toast{ background:var(--panel); border:1px solid var(--borde); border-left:4px solid var(--acento);
-    padding:10px 14px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18);
-    font-size:.86rem; animation:slideUp .25s ease both; max-width:320px; }
+  .toast{
+    background:color-mix(in srgb, var(--panel) 92%, transparent);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    border:1px solid var(--borde); border-left:4px solid var(--acento);
+    padding:10px 14px; border-radius:12px; box-shadow:var(--sombra-2);
+    font-size:.86rem; animation:slideUp .25s ease both; max-width:320px;
+    transition:opacity .25s ease;
+  }
   .toast.ok{ border-left-color:#16a34a; }
   .toast.err{ border-left-color:#dc2626; }
 
-  .tab-activa{ background:var(--acento); color:#fff; box-shadow:0 6px 18px rgba(29,78,216,.35); }
   details>summary{ list-style:none; cursor:pointer; }
   details>summary::-webkit-details-marker{ display:none; }
   .chev{ transition:transform .2s; }
   details[open] .chev{ transform:rotate(90deg); }
-  #arriba{ position:fixed; right:16px; bottom:74px; z-index:80; opacity:0; pointer-events:none; transition:.25s; }
+
+  /* Botón volver arriba: acento sólido para que destaque sobre las tablas */
+  #arriba{
+    position:fixed; right:16px; bottom:74px; z-index:80; opacity:0; pointer-events:none;
+    transition:.25s;
+    background:linear-gradient(135deg,var(--acento),var(--acento2)); color:#fff; border-color:transparent;
+    box-shadow:0 8px 20px color-mix(in srgb, var(--acento) 40%, transparent);
+  }
   #arriba.ver{ opacity:1; pointer-events:auto; }
+  #arriba:hover{ transform:translateY(-2px); }
 
   /* ===== Modal (autenticación por rol) ===== */
   .modal-overlay{ position:fixed; inset:0; z-index:200; background:rgba(2,6,23,.55);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
     display:flex; align-items:center; justify-content:center; padding:16px;
     animation:fadeIn .2s ease both; }
   .modal{ width:100%; max-width:380px; border-radius:16px; padding:22px;
@@ -79,9 +160,8 @@
      y las clases de umbral de colorPct. Los SVG usan currentColor/var(--...). */
 
   /* Tarjetas del tablero: mismo lenguaje visual + micro-hover como en las tablas */
-  .tb-card{ transition:transform .15s ease, box-shadow .15s ease; }
-  .tb-card:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(2,6,23,.10); }
-  html.dark .tb-card:hover{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
+  .tb-card{ box-shadow:var(--sombra-1); transition:transform .15s ease, box-shadow .15s ease; }
+  .tb-card:hover{ transform:translateY(-2px); box-shadow:var(--sombra-2); }
 
   /* Transiciones de las piezas SVG/barras animadas al montar */
   .tb-arc{ transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1); }
@@ -111,7 +191,9 @@
   /* Accesibilidad: sin animaciones de entrada si el usuario lo pide.
      El JS ya pinta el estado final directo (reduce=true); aquí neutralizamos las transiciones. */
   @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior:auto; }
     .tb-card, .tb-arc, .tb-seg, .tb-bseg, .tb-meta,
-    #tb-rank-list [data-w]{ transition:none !important; }
-    .tb-card:hover{ transform:none; }
+    #tb-rank-list [data-w], #resumen > div, button{ transition:none !important; }
+    .tb-card:hover, #resumen > div:hover, #arriba:hover{ transform:none; }
+    button:active{ transform:none; }
   }
