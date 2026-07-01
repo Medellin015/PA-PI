@@ -73,3 +73,45 @@
   .modal{ width:100%; max-width:380px; border-radius:16px; padding:22px;
     box-shadow:0 20px 60px rgba(0,0,0,.35); }
   .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+
+  /* ===== Vista Tablero (dashboard ejecutivo, solo lectura) =====
+     Todo hereda el tema por variables (--panel/--texto/--suave/--borde/--acento)
+     y las clases de umbral de colorPct. Los SVG usan currentColor/var(--...). */
+
+  /* Tarjetas del tablero: mismo lenguaje visual + micro-hover como en las tablas */
+  .tb-card{ transition:transform .15s ease, box-shadow .15s ease; }
+  .tb-card:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(2,6,23,.10); }
+  html.dark .tb-card:hover{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
+
+  /* Transiciones de las piezas SVG/barras animadas al montar */
+  .tb-arc{ transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1); }
+  .tb-seg{ transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1); }
+  .tb-bseg{ transition:width .6s cubic-bezier(.2,.7,.3,1); }
+  .tb-meta{ transition:width .6s cubic-bezier(.2,.7,.3,1); }
+  #tb-rank-list [data-w]{ transition:width .5s cubic-bezier(.2,.7,.3,1); }
+
+  /* Toggle del ranking: usa el mismo activo que las pestañas (.tab-activa) */
+  .tb-toggle{ transition:.15s; }
+  .tb-toggle:hover{ background:rgba(148,163,184,.12); }
+  .tb-toggle:focus-visible{ outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 45%, transparent); }
+
+  /* Ítem de leyenda activo (categoría filtrada) */
+  .tb-leg-on{ background:color-mix(in srgb, var(--acento) 12%, transparent); }
+  .tb-leg:focus-visible{ outline:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--acento) 55%, transparent); }
+
+  /* KPI de captura clicable/enfocable (accesible por teclado) y select del ranking.
+     El estilo de foco se aplica ahora que .tb-kpi-captura se emite en el ÚNICO atributo
+     class de la tarjeta (antes venía en un segundo class= que el parser HTML descartaba). */
+  .tb-kpi-captura:focus-visible{ outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 40%, transparent); }
+  #tb-topn:focus-visible{ outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 40%, transparent); }
+
+  /* Desplazamiento suave con margen para el ancla del ranking bajo el header sticky */
+  .scroll-mt-24{ scroll-margin-top:6rem; }
+
+  /* Accesibilidad: sin animaciones de entrada si el usuario lo pide.
+     El JS ya pinta el estado final directo (reduce=true); aquí neutralizamos las transiciones. */
+  @media (prefers-reduced-motion: reduce){
+    .tb-card, .tb-arc, .tb-seg, .tb-bseg, .tb-meta,
+    #tb-rank-list [data-w]{ transition:none !important; }
+    .tb-card:hover{ transform:none; }
+  }

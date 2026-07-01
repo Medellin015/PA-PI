@@ -27,11 +27,25 @@ PA-PI/
 El orden de carga de los scripts en `index.html` es importante:
 `datos.js → firebase-config.js → db.js → app.js`.
 
+## Vistas
+
+La app tiene tres pestañas:
+
+- **📈 Tablero** (vista por defecto): panel ejecutivo de solo lectura que se
+  calcula en vivo desde `PI_DATA`/`PA_DATA` y los datos editados. Incluye
+  medidores tipo semáforo (avance de meta, reportados, ejecución financiera y
+  física, índice físico-financiero), KPIs de presupuesto con barra de ejecución,
+  dona de indicadores por categoría de avance, cumplimiento por vigencia y un
+  ranking de cumplimiento con conmutador Indicadores/Productos, Top/Bottom y
+  filtro por categoría. Se recalcula al editar en las otras vistas.
+- **📊 Plan Indicativo** y **📋 Plan de Acción**: captura y edición de datos.
+
 ## Cómo usarla
 
 1. Abrir `index.html` en el navegador (doble clic) o publicarla en cualquier
    hosting estático.
-2. Seleccionar el usuario, escribir la contraseña y pulsar **Ingresar**.
+2. Abre en modo **Invitado (solo lectura)** en la vista **Tablero**. Para editar,
+   elegir un rol en el selector de la barra superior e ingresar su contraseña.
 
 ## Roles y contraseñas
 
