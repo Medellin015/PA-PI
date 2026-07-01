@@ -11,6 +11,11 @@
   tailwind.config = { darkMode: 'class' };
 </script>
 
+<!-- Tipografía Inter (con respaldo a fuentes del sistema si no carga) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+
 <!-- Firebase (SDK compat) — opcional, ver js/firebase-config.js -->
 <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
@@ -31,7 +36,7 @@
   <!-- Encabezado -->
   <header class="panel borde sticky top-0 z-40 border-b">
     <div class="max-w-none px-4 py-2.5 flex items-center gap-3">
-      <div class="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-white font-black"
+      <div class="logo-pc h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-white font-black"
            style="background:linear-gradient(135deg,var(--acento),var(--acento2))">PC</div>
       <div class="min-w-0">
         <h1 class="text-sm sm:text-base font-bold truncate">Seguimiento — Participación Ciudadana</h1>
