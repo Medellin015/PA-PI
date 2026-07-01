@@ -2,7 +2,7 @@
 (function(){
   /* ===== 1. Estado y utilidades ===== */
   let sesion = { usuario:null, rol:'invitado', sub:null, nombre:'Invitado' };
-  let vista = 'indicativo';
+  let vista = 'tablero';
   let filtroSubPA = 'Todas';
   const estado = { pi:{}, pa:{} };          // parches cargados/editados
   const SUBS = ['Planeación Local y Presupuesto Participativo','Formación Ciudadana','Organización Social','Unidad Administrativa'];
@@ -158,8 +158,8 @@
 
     if (!appLista){
       appLista = true;
-      window.DB.suscribir('pi', m => { estado.pi = m; if (vista==='indicativo') render(); });
-      window.DB.suscribir('pa', m => { estado.pa = m; if (vista==='accion') render(); });
+      window.DB.suscribir('pi', m => { estado.pi = m; if (vista==='indicativo' || vista==='tablero') render(); });
+      window.DB.suscribir('pa', m => { estado.pa = m; if (vista==='accion' || vista==='tablero') render(); });
       $$('.btn-tab').forEach(b => b.onclick = () => { vista = b.dataset.vista; render(); });
       $('#btn-tema').onclick = alternarTema;
       $('#btn-exportar').onclick = exportarExcel;
@@ -192,6 +192,17 @@
   /* ===== 4. Render: resumen + filtros ===== */
   function render(){
     $$('.btn-tab').forEach(b => b.classList.toggle('tab-activa', b.dataset.vista===vista));
+    if (vista==='tablero'){
+      // Tablero: 100% solo lectura; calcula todo desde PI_DATA/PA_DATA + estado.
+      // No usa las barras #resumen/#filtros (asumen indicativo/accion): se limpian
+      // y se ocultan, y NO se llama enlazarEdicion (el tablero no emite inputs).
+      const r = $('#resumen'); if (r){ r.innerHTML = ''; r.classList.add('hidden'); }
+      const f = $('#filtros'); if (f){ f.innerHTML = ''; f.classList.add('hidden'); }
+      renderTablero();
+      return;
+    }
+    const r = $('#resumen'); if (r) r.classList.remove('hidden');
+    const f = $('#filtros'); if (f) f.classList.remove('hidden');
     pintarResumen();
     pintarFiltros();
     if (vista==='indicativo') renderPI(); else renderPA();
@@ -496,6 +507,365 @@
       const okQ = !q || (tr.dataset.busca||'').includes(q);
       tr.style.display = (okNiv && okQ) ? '' : 'none';
     });
+  }
+
+  /* ===== 6.b Render: Tablero (dashboard ejecutivo, solo lectura) =====
+     Se calcula 100% desde PI_DATA/PA_DATA + parches en vivo (estado.pi/estado.pa)
+     leídos vía valTexto. No emite inputs/textarea ni atributos data-campo:
+     enlazarEdicion() nunca corre en esta vista. Respeta el tema con variables CSS
+     (--panel/--texto/--suave/--borde/--acento) y las mismas clases de colorPct. */
+  function renderTablero(){
+    // Helper numérico-seguro: NO usar parseNum aquí. La base ya trae números
+    // (0.468, 62.7) y parseNum borraría el punto (0.468 -> 468). numTab devuelve
+    // el number tal cual si ya es number, y solo parsea cadenas es-CO de parches.
+    const numTab = (v) => {
+      if (v==null || v==='') return null;
+      if (typeof v==='number') return isNaN(v) ? null : v;
+      const s = String(v).trim().replace(/\./g,'').replace(',', '.').trim();
+      if (s==='') return null;
+      const n = Number(s);
+      return isNaN(n) ? null : n;
+    };
+    const pctSeguro = (v, base) => (v!=null && base!=null && base!==0) ? (v/base*100) : null;
+    const valPI  = (p) => { const l3 = numTab(valTexto('pi',p,'l3006')); return l3!=null ? l3 : numTab(valTexto('pi',p,'l0204')); };
+    // Patch-aware: un 0 REPORTADO por el usuario (parche en estado.pa con el campo
+    // 'ej3006' presente) se respeta; solo el 0 placeholder de la base cae a abril.
+    const valBIEN= (b) => {
+      const parch = estado.pa[b.id] && ('ej3006' in estado.pa[b.id]);
+      const e3 = numTab(valTexto('pa',b,'ej3006'));
+      if (parch && e3!=null) return e3;
+      if (e3!=null && e3>0) return e3;
+      return numTab(valTexto('pa',b,'ej0204'));
+    };
+    const reduce = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+    const pct1 = (p) => (p==null || isNaN(p)) ? '—' : nfNum.format(p)+'%';
+
+    /* ---- Agregados (todos con numTab; división protegida) ---- */
+    const totalPI = PI_DATA.length;
+    const res = PI_DATA.filter(p=>p.tipo==='Resultado').length;
+    const prod = totalPI - res;
+
+    let captura=0, s26=0, n26=0;
+    const catCount = [0,0,0,0,0]; // <30, 30-70, 70-100, 100-110, >110
+    const filasPI = PI_DATA.map(p => {
+      if (numTab(valTexto('pi',p,'l3006'))!=null) captura++;
+      const v = valPI(p), m = numTab(p.m26);
+      const pct = pctSeguro(v, m);
+      if (pct!=null){ s26 += Math.min(pct,200); n26++;
+        if (pct<30) catCount[0]++; else if (pct<70) catCount[1]++;
+        else if (pct<100) catCount[2]++; else if (pct<=110) catCount[3]++; else catCount[4]++; }
+      return { cod:p.cod, nom:p.nom, tipo:p.tipo, pct };
+    });
+    const avance2026 = n26 ? s26/n26 : null;
+    const reportados = totalPI ? captura/totalPI*100 : 0;
+
+    // 2024 / 2025 (sin cap; usan logros oficiales anuales)
+    const promAnio = (campoL, campoM) => {
+      let s=0,n=0; PI_DATA.forEach(p => { const l=numTab(p[campoL]), m=numTab(p[campoM]); const pc=pctSeguro(l,m); if(pc!=null){s+=pc;n++;} });
+      return n ? s/n : null;
+    };
+    const meta2024 = promAnio('l24','m24');
+    const meta2025 = promAnio('l25','m25');
+
+    // Presupuesto: sumar SOLO nivel Proyecto (evita doble conteo Pilar/Componente/Programa)
+    const proyectos = PA_DATA.filter(f=>f.nivel==='Proyecto');
+    let pIni=0, pAj=0, pEj=0;
+    proyectos.forEach(f => { pIni += numTab(valTexto('pa',f,'pptoIni'))||0; pAj += numTab(valTexto('pa',f,'pptoAj'))||0; pEj += numTab(valTexto('pa',f,'ej3006'))||0; });
+    const pDisp = pAj - pEj;
+    const pDispMostrar = Math.max(0, pDisp);   // el texto 'Disponible' no muestra montos negativos ante sobre-ejecución (admin)
+    const ejecFin = pAj>0 ? pEj/pAj*100 : null;
+    const pctEjecSeg = pAj>0 ? Math.max(0, Math.min(100, pEj/pAj*100)) : 0;
+    const sobreEjec = pAj>0 && pEj>pAj;
+    const varPpto = pAj - pIni;
+    const varPctPpto = pIni>0 ? varPpto/pIni*100 : null;
+    const pilar = PA_DATA.find(f=>f.nivel==='Pilar');
+    const pilarAj = pilar ? numTab(pilar.pptoAj) : null;
+    const pilarEj = pilar ? numTab(pilar.ej3006) : null;
+
+    // Física de productos (BIEN) con fallback a ej0204
+    const biens = PA_DATA.filter(f=>f.nivel==='BIEN');
+    let sf=0, nf=0;
+    const filasPA = biens.map(b => {
+      const v = valBIEN(b), plan = numTab(valTexto('pa',b,'plan'));
+      const pct = pctSeguro(v, plan);
+      if (pct!=null){ sf += Math.min(pct,200); nf++; }
+      return { cod:b.cod, nom:b.desc, sub:b.sub, pct };
+    });
+    const ejecFis = nf ? sf/nf : null;
+    const ponderadoFF = (ejecFin!=null && ejecFis!=null) ? 0.5*ejecFin+0.5*ejecFis : null;
+
+    /* ---- Pieza: KPI (mismo patrón visual que tarjeta()) ----
+       Acepta clsCard extra para concatenar clases en el ÚNICO atributo class del
+       literal. NO inyectar un segundo class= por extraAttr: el parser HTML lo
+       descartaría y perdería, p. ej., el foco accesible de .tb-kpi-captura. */
+    const kpi = (t, v, sub, cls, clsCard='', extraAttr='') => `
+      <div class="tb-card panel borde border rounded-xl px-3.5 py-2.5 anim-up ${clsCard}" ${extraAttr}>
+        <div class="text-[11px] txt-suave uppercase tracking-wide">${esc(t)}</div>
+        <div class="text-xl sm:text-2xl font-bold tabular-nums ${cls||''}">${v}</div>
+        ${sub?`<div class="text-[11px] txt-suave mt-0.5">${esc(sub)}</div>`:''}
+      </div>`;
+    const kpisHTML = `
+      <div id="tb-kpis" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        ${kpi('Indicadores', String(totalPI), res+' de resultado · '+prod+' de producto')}
+        ${kpi('Presupuesto ajustado', fmtMill(pAj), (varPpto>=0?'+':'')+fmtMill(varPpto)+' ('+(varPctPpto==null?'—':(varPctPpto>=0?'+':'')+nfNum.format(varPctPpto)+'%')+') vs. inicial', (varPpto>=0?'text-green-600 dark:text-green-400':'text-red-500'))}
+        ${kpi('Ejecutado 30/06', fmtMill(pEj), (ejecFin==null?'—':nfNum.format(ejecFin)+'% del ajustado'))}
+        ${kpi('Productos', String(biens.length), 'bienes en '+proyectos.length+' proyectos')}
+        ${kpi('Captura 30/06', captura+'/'+totalPI, 'indicadores reportados', (captura<totalPI?'text-amber-500':'text-green-600 dark:text-green-400'), 'tb-kpi-captura', 'id="tb-kpi-captura" role="link" tabindex="0" title="Ir al ranking" style="cursor:pointer"')}
+      </div>`;
+
+    /* ---- Pieza: Gauge semicircular SVG (fluido con viewBox) ---- */
+    const gauge = (titulo, pctVal, aria) => {
+      const c = colorPct(pctVal);
+      const clsTxt = (pctVal==null) ? 'txt-suave' : c[1];
+      const R = 80, LEN = Math.PI*R;
+      const frac = (pctVal==null) ? 0 : Math.max(0, Math.min(1, pctVal/100));
+      const offInicial = reduce ? LEN*(1-frac) : LEN;
+      const offFinal = LEN*(1-frac);
+      const path = `M 20 100 A ${R} ${R} 0 0 1 180 100`;
+      const label = pct1(pctVal);
+      return `
+        <div class="tb-gauge flex flex-col items-center anim-pop">
+          <svg viewBox="0 0 200 118" style="width:100%;max-width:150px" role="img" aria-label="${esc(aria)}: ${esc(label)}">
+            <path d="${path}" fill="none" stroke="var(--suave)" stroke-opacity=".2" stroke-width="14" stroke-linecap="round" aria-hidden="true"/>
+            <path class="tb-arc ${clsTxt}" d="${path}" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="${LEN.toFixed(2)}" stroke-dashoffset="${offInicial.toFixed(2)}" data-off="${offFinal.toFixed(2)}" aria-hidden="true"/>
+            <text x="100" y="92" text-anchor="middle" class="${clsTxt}" fill="currentColor" font-size="30" font-weight="700" style="font-variant-numeric:tabular-nums">${esc(label)}</text>
+          </svg>
+          <div class="text-[11px] txt-suave text-center mt-0.5 leading-tight">${esc(titulo)}</div>
+        </div>`;
+    };
+    const gaugesHTML = `
+      <div class="tb-card panel borde border rounded-xl p-3 lg:col-span-2 anim-up">
+        <div class="text-sm font-bold mb-2">Medidores clave del corte</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          ${gauge('Avance meta 2026', avance2026, 'Avance meta 2026')}
+          ${gauge('Reportados 30/06', reportados, 'Indicadores reportados')}
+          ${gauge('Ejec. financiera', ejecFin, 'Ejecución financiera')}
+          ${gauge('Ejec. física', ejecFis, 'Ejecución física de productos')}
+          ${gauge('Índice físico-financiero', ponderadoFF, 'Índice físico-financiero')}
+        </div>
+        <p class="text-[11px] txt-suave mt-2">Promedios sobre ${totalPI} indicadores y ${biens.length} productos. El índice físico-financiero pondera 50% ejecución financiera y 50% física.</p>
+      </div>`;
+
+    /* ---- Pieza: Dona de categorías (SVG stroke-dasharray) ---- */
+    const CATS = [
+      { nom:'Crítico (<30%)',        c:catCount[0], cls:'text-red-500',                     stroke:'#ef4444' },
+      { nom:'Bajo (30-70%)',         c:catCount[1], cls:'text-amber-500',                   stroke:'#f59e0b' },
+      { nom:'En avance (70-100%)',   c:catCount[2], cls:'text-lime-600 dark:text-lime-400', stroke:'#84cc16' },
+      { nom:'Cumplido (100-110%)',   c:catCount[3], cls:'text-green-600 dark:text-green-400',stroke:'#22c55e' },
+      { nom:'Sobrecumplido (>110%)', c:catCount[4], cls:'text-sky-600 dark:text-sky-400',   stroke:'#0ea5e9' },
+    ];
+    const clasificados = CATS.reduce((a,x)=>a+x.c,0) || 1;
+    const RD = 60, CIRC = 2*Math.PI*RD;
+    let acum = 0;
+    // Segmentos aria-hidden: el <svg> contenedor ya es role="img" con aria-label,
+    // y la leyenda de botones aporta el detalle accesible (evita role="img" anidado).
+    const segs = CATS.filter(x=>x.c>0).map(x => {
+      const frac = x.c/clasificados;
+      const len = CIRC*frac;
+      const gap = CIRC - len;
+      const dashoffset = reduce ? (-acum) : CIRC;
+      const seg = `<circle class="tb-seg" cx="90" cy="90" r="${RD}" fill="none" stroke="${x.stroke}" stroke-width="20"
+        stroke-dasharray="${len.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${dashoffset.toFixed(2)}"
+        data-off="${(-acum).toFixed(2)}" transform="rotate(-90 90 90)" aria-hidden="true"></circle>`;
+      acum += len;
+      return seg;
+    }).join('');
+    const leyendaDona = CATS.map(x => `
+      <button type="button" class="tb-leg flex items-center gap-2 w-full text-left rounded-lg px-2 py-1 hover:bg-black/[.02] dark:hover:bg-white/[.03] focus:outline-none" data-cat="${esc(x.nom)}" aria-pressed="false">
+        <span class="inline-block h-3 w-3 rounded-sm shrink-0" style="background:${x.stroke}" aria-hidden="true"></span>
+        <span class="text-[11px] flex-1 ${x.cls}">${esc(x.nom)}</span>
+        <span class="text-[11px] tabular-nums txt-suave">${x.c} · ${nfNum.format(x.c/clasificados*100)}%</span>
+      </button>`).join('');
+    const donaHTML = `
+      <div id="tb-dona" class="tb-card panel borde border rounded-xl p-3 lg:col-span-1 anim-up">
+        <div class="text-sm font-bold mb-2">Indicadores por categoría de avance</div>
+        <div class="flex items-center gap-3">
+          <svg viewBox="0 0 180 180" style="width:44%;max-width:150px" role="img" aria-label="Distribución de ${clasificados} indicadores clasificados por categoría de avance">
+            <circle cx="90" cy="90" r="${RD}" fill="none" stroke="var(--suave)" stroke-opacity=".15" stroke-width="20" aria-hidden="true"></circle>
+            ${segs}
+            <text x="90" y="86" text-anchor="middle" fill="currentColor" font-size="34" font-weight="700" style="font-variant-numeric:tabular-nums">${clasificados}</text>
+            <text x="90" y="108" text-anchor="middle" fill="var(--suave)" font-size="13">clasificados</text>
+          </svg>
+          <div class="flex-1 space-y-0.5">${leyendaDona}</div>
+        </div>
+        <p class="text-[10px] txt-suave mt-1">Clic en una categoría para filtrar el ranking.${clasificados<totalPI?' '+(totalPI-clasificados)+' sin dato clasificable.':''}</p>
+      </div>`;
+
+    /* ---- Pieza: Barra apilada de presupuesto ---- */
+    const cEjec = colorPct(ejecFin);
+    const budgetHTML = `
+      <div id="tb-budget" class="tb-card panel borde border rounded-xl p-3 anim-up">
+        <div class="flex items-baseline justify-between flex-wrap gap-1 mb-2">
+          <div class="text-sm font-bold">Ejecución presupuestal (${proyectos.length} proyectos)</div>
+          <div class="text-[11px] txt-suave">Ajustado ${fmtMill(pAj)}</div>
+        </div>
+        <div class="w-full h-6 rounded-lg overflow-hidden flex border borde" role="img" aria-label="Ejecutado ${esc(pct1(ejecFin))} de ${esc(fmtMill(pAj))}">
+          <div class="tb-bseg h-full flex items-center justify-center text-[10px] font-semibold text-white" style="width:${reduce?pctEjecSeg.toFixed(2):'0'}%;background:var(--acento)" data-w="${pctEjecSeg.toFixed(2)}" title="Ejecutado: ${esc(fmtMill(pEj))} (${esc(pct1(ejecFin))})">${pctEjecSeg>=12?esc(pct1(ejecFin)):''}</div>
+          <div class="tb-bseg h-full" style="width:${reduce?(100-pctEjecSeg).toFixed(2):'100'}%;background:var(--suave);opacity:.18" data-w="${(100-pctEjecSeg).toFixed(2)}" title="Disponible: ${esc(fmtMill(pDispMostrar))} (${esc(pct1(100-pctEjecSeg))})"></div>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px]">
+          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background:var(--acento)" aria-hidden="true"></span>Ejecutado <b class="${cEjec[1]}">${esc(fmtMill(pEj))}</b> (${esc(pct1(ejecFin))})</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background:var(--suave);opacity:.35" aria-hidden="true"></span>Disponible <b>${esc(fmtMill(pDispMostrar))}</b> (${esc(pct1(100-pctEjecSeg))})</span>
+          <span class="txt-suave">Inicial ${esc(fmtMill(pIni))} → Ajustado ${esc(fmtMill(pAj))}</span>
+        </div>
+        ${sobreEjec?`<p class="text-[11px] text-red-500 mt-2">El ejecutado supera el ajustado en ${esc(fmtMill(pEj-pAj))}; la barra se limita al 100%.</p>`:''}
+        <p class="text-[11px] txt-suave mt-2">Agregado sobre los ${proyectos.length} Proyectos. El total del Pilar reporta ${esc(fmtMill(pilarAj))} / ${esc(fmtMill(pilarEj))}; el saldo (${esc(fmtMill((pilarAj||0)-pAj))} ajustado, ${esc(fmtMill((pilarEj||0)-pEj))} ejecutado) no está distribuido a nivel proyecto.</p>
+      </div>`;
+
+    /* ---- Pieza: Metas por vigencia ---- */
+    const barraMeta = (anio, val) => {
+      const c = colorPct(val);
+      const w = (val==null) ? 0 : Math.max(0, Math.min(100, val));
+      return `
+        <div class="mb-2.5">
+          <div class="flex items-baseline justify-between text-xs mb-1">
+            <span class="font-semibold">${anio}</span>
+            <span class="tabular-nums ${c[1]}">${esc(pct1(val))}</span>
+          </div>
+          <div class="w-full h-3 rounded-full overflow-hidden" style="background:color-mix(in srgb, var(--suave) 18%, transparent)" role="img" aria-label="Cumplimiento ${anio}: ${esc(pct1(val))}">
+            <div class="tb-meta h-full rounded-full ${c[1]}" style="width:${reduce?w.toFixed(2):'0'}%;background:currentColor" data-w="${w.toFixed(2)}"></div>
+          </div>
+        </div>`;
+    };
+    const metasHTML = `
+      <div id="tb-metas" class="tb-card panel borde border rounded-xl p-3 anim-up">
+        <div class="text-sm font-bold mb-2">Cumplimiento por vigencia</div>
+        ${barraMeta(2024, meta2024)}
+        ${barraMeta(2025, meta2025)}
+        ${barraMeta(2026, avance2026)}
+        <p class="text-[11px] txt-suave mt-1">2024 y 2025 pueden superar 100% porque varios logros superaron su meta anual (p. ej. 3.2.7: l25=54,39 vs. m25=39,5). 2026 es corte parcial al 30/06.</p>
+      </div>`;
+
+    /* ---- Pieza: Ranking con toggle PI / PA ---- */
+    const filaRank = (r) => {
+      const c = colorPct(r.pct);
+      const w = (r.pct==null) ? 0 : Math.max(0, Math.min(100, r.pct));
+      return `
+        <div class="tb-rrow flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-black/[.02] dark:hover:bg-white/[.03]">
+          <span class="text-[10px] font-mono txt-suave w-16 shrink-0 whitespace-nowrap">${esc(r.cod)}</span>
+          <span class="text-[11px] flex-1 min-w-0 truncate" title="${esc(r.nom)}">${esc(r.nom)}</span>
+          <span class="hidden sm:block w-24 shrink-0"><span class="block h-2 rounded-full ${c[1]}" style="width:${reduce?w.toFixed(1):'0'}%;background:currentColor" data-w="${w.toFixed(1)}"></span></span>
+          <span class="tb-chip text-[11px] font-semibold px-2 py-0.5 rounded ${c[1]} ${c[2]} tabular-nums w-16 text-center shrink-0">${c[0]}</span>
+        </div>`;
+    };
+    const ordPI = filasPI.filter(r=>r.pct!=null).sort((a,b)=>b.pct-a.pct);
+    const ordPA = filasPA.filter(r=>r.pct!=null).sort((a,b)=>b.pct-a.pct);
+    const rankingHTML = `
+      <div id="tb-ranking" class="tb-card panel borde border rounded-xl p-3 anim-up scroll-mt-24">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <div class="text-sm font-bold">Ranking de cumplimiento</div>
+          <div class="flex items-center gap-1" role="group" aria-label="Fuente del ranking">
+            <button type="button" id="tb-tg-pi" class="tb-toggle text-[11px] px-3 py-1.5 rounded-lg borde border font-medium tab-activa" aria-pressed="true" style="min-height:40px">Indicadores</button>
+            <button type="button" id="tb-tg-pa" class="tb-toggle text-[11px] px-3 py-1.5 rounded-lg borde border font-medium" aria-pressed="false" style="min-height:40px">Productos</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mb-2 text-[11px]">
+          <label class="txt-suave" for="tb-topn">Mostrar:</label>
+          <select id="tb-topn" class="panel borde border rounded-lg px-2 py-1.5 text-[11px] focus:outline-none" style="min-height:40px">
+            <option value="all">Todos</option>
+            <option value="top5">Top 5</option>
+            <option value="top10">Top 10</option>
+            <option value="bot5">Bottom 5</option>
+            <option value="bot10">Bottom 10</option>
+          </select>
+          <span id="tb-rank-count" class="txt-suave ml-auto"></span>
+        </div>
+        <div id="tb-rank-list" class="overflow-y-auto pr-1" style="max-height:60vh"></div>
+      </div>`;
+
+    /* ---- Ensamblado en #contenido (orden = orden de lectura) ---- */
+    $('#contenido').innerHTML = `
+      <div class="space-y-3">
+        ${kpisHTML}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          ${gaugesHTML}
+          ${donaHTML}
+        </div>
+        ${budgetHTML}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          ${metasHTML}
+          ${rankingHTML}
+        </div>
+      </div>`;
+
+    /* ---- Estado local del ranking (NO toca filtroSubPA global) ---- */
+    let rkFuente = 'pi';        // 'pi' | 'pa'
+    let rkTopN = 'all';
+    let rkCat = null;           // filtro por categoría desde la dona (solo aplica a 'pi')
+
+    const enCat = (pct) => {
+      if (rkCat==null) return true;
+      if (pct==null) return false;
+      const idx = pct<30?0 : pct<70?1 : pct<100?2 : pct<=110?3 : 4;
+      return CATS[idx] && CATS[idx].nom===rkCat;
+    };
+    function pintarRanking(){
+      const base = (rkFuente==='pi') ? ordPI : ordPA;
+      let lista = (rkFuente==='pi') ? base.filter(r=>enCat(r.pct)) : base.slice();
+      if (rkTopN==='top5') lista = lista.slice(0,5);
+      else if (rkTopN==='top10') lista = lista.slice(0,10);
+      else if (rkTopN==='bot5') lista = lista.slice(-5).reverse();
+      else if (rkTopN==='bot10') lista = lista.slice(-10).reverse();
+      const cont = $('#tb-rank-list');
+      if (cont){
+        cont.classList.remove('anim-fade'); void cont.offsetWidth; cont.classList.add('anim-fade');
+        cont.innerHTML = lista.length ? lista.map(filaRank).join('')
+          : `<div class="text-[11px] txt-suave px-2 py-3 text-center">Sin registros para el filtro.</div>`;
+      }
+      const cnt = $('#tb-rank-count');
+      // El sufijo de categoría solo se muestra en fuente 'pi' (enCat no filtra 'pa'),
+      // evitando anunciar un filtro que no está aplicado sobre productos.
+      if (cnt) cnt.textContent = lista.length + (rkFuente==='pi' ? ' indicadores' : ' productos') + ((rkCat && rkFuente==='pi')?(' · '+rkCat):'');
+      if (!reduce && typeof requestAnimationFrame==='function') requestAnimationFrame(animarBarras);
+    }
+
+    /* ---- Animaciones de entrada (respetan prefers-reduced-motion) ---- */
+    function animarBarras(){
+      if (reduce) return;
+      $$('#contenido .tb-arc').forEach(el => { const o=el.getAttribute('data-off'); if(o!=null) el.style.strokeDashoffset=o; });
+      $$('#contenido .tb-seg').forEach(el => { const o=el.getAttribute('data-off'); if(o!=null) el.style.strokeDashoffset=o; });
+      $$('#contenido .tb-bseg, #contenido .tb-meta, #tb-rank-list [data-w]').forEach(el => { const w=el.getAttribute('data-w'); if(w!=null) el.style.width=w+'%'; });
+    }
+
+    /* ---- Enganche de controles LOCALES (re-hechos tras cada render) ---- */
+    const bPI = $('#tb-tg-pi'), bPA = $('#tb-tg-pa');
+    if (bPI && bPA){
+      const setTog = (f) => {
+        rkFuente = f;
+        // Al pasar a 'pa' el filtro por categoría (solo aplicable a 'pi') se limpia
+        // para no dejar un sufijo/estado de leyenda engañoso en el contador.
+        if (f==='pa' && rkCat!=null){
+          rkCat = null;
+          $$('#tb-dona .tb-leg').forEach(b => { b.classList.remove('tb-leg-on'); b.setAttribute('aria-pressed','false'); });
+        }
+        bPI.classList.toggle('tab-activa', f==='pi'); bPI.setAttribute('aria-pressed', String(f==='pi'));
+        bPA.classList.toggle('tab-activa', f==='pa'); bPA.setAttribute('aria-pressed', String(f==='pa'));
+        pintarRanking();
+      };
+      bPI.onclick = () => setTog('pi');
+      bPA.onclick = () => setTog('pa');
+    }
+    const selN = $('#tb-topn');
+    if (selN) selN.onchange = (e) => { rkTopN = e.target.value; pintarRanking(); };
+    $$('#tb-dona .tb-leg').forEach(btn => {
+      btn.onclick = () => {
+        const cat = btn.getAttribute('data-cat');
+        rkCat = (rkCat===cat) ? null : cat;
+        if (rkFuente!=='pi'){ rkFuente='pi'; if(bPI&&bPA){ bPI.classList.add('tab-activa'); bPI.setAttribute('aria-pressed','true'); bPA.classList.remove('tab-activa'); bPA.setAttribute('aria-pressed','false'); } }
+        $$('#tb-dona .tb-leg').forEach(b => { const on = (b===btn && rkCat!=null); b.classList.toggle('tb-leg-on', on); b.setAttribute('aria-pressed', String(on)); });
+        pintarRanking();
+      };
+    });
+    const capEl = $('#tb-kpi-captura');
+    if (capEl){
+      const irRanking = () => { const t=$('#tb-ranking'); if(t) t.scrollIntoView({behavior: reduce?'auto':'smooth', block:'start'}); };
+      capEl.onclick = irRanking;
+      capEl.onkeydown = (e) => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); irRanking(); } };
+    }
+
+    pintarRanking();
+    if (!reduce && typeof requestAnimationFrame==='function') requestAnimationFrame(() => requestAnimationFrame(animarBarras));
   }
 
   /* ===== 7. Edición y guardado ===== */
