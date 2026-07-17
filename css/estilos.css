@@ -166,7 +166,6 @@
   /* Transiciones de las piezas SVG/barras animadas al montar */
   .tb-arc{ transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1); }
   .tb-seg{ transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1); }
-  .tb-bseg{ transition:width .6s cubic-bezier(.2,.7,.3,1); }
   .tb-meta{ transition:width .6s cubic-bezier(.2,.7,.3,1); }
   #tb-rank-list [data-w]{ transition:width .5s cubic-bezier(.2,.7,.3,1); }
 
@@ -198,7 +197,7 @@
      El JS ya pinta el estado final directo (reduce=true); aquí neutralizamos las transiciones. */
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior:auto; }
-    .tb-card, .tb-arc, .tb-seg, .tb-bseg, .tb-meta,
+    .tb-card, .tb-arc, .tb-seg, .tb-meta,
     #tb-rank-list [data-w], #resumen > div, button{ transition:none !important; }
     .tb-card:hover, #resumen > div:hover, #arriba:hover{ transform:none; }
     button:active{ transform:none; }

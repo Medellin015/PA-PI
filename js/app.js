@@ -160,6 +160,7 @@
       appLista = true;
       window.DB.suscribir('pi', m => { estado.pi = m; if (vista==='indicativo' || vista==='tablero') render(); });
       window.DB.suscribir('pa', m => { estado.pa = m; if (vista==='accion' || vista==='tablero') render(); });
+      window.DB.suscribir('tab', m => { estado.tab = m; if (vista==='tablero') render(); });
       $$('.btn-tab').forEach(b => b.onclick = () => { vista = b.dataset.vista; render(); });
       $('#btn-tema').onclick = alternarTema;
       $('#btn-exportar').onclick = exportarExcel;
@@ -808,7 +809,7 @@
       if (reduce) return;
       $$('#contenido .tb-arc').forEach(el => { const o=el.getAttribute('data-off'); if(o!=null) el.style.strokeDashoffset=o; });
       $$('#contenido .tb-seg').forEach(el => { const o=el.getAttribute('data-off'); if(o!=null) el.style.strokeDashoffset=o; });
-      $$('#contenido .tb-bseg, #contenido .tb-meta, #tb-rank-list [data-w]').forEach(el => { const w=el.getAttribute('data-w'); if(w!=null) el.style.width=w+'%'; });
+      $$('#contenido .tb-meta, #tb-rank-list [data-w]').forEach(el => { const w=el.getAttribute('data-w'); if(w!=null) el.style.width=w+'%'; });
     }
 
     /* ---- Enganche de controles LOCALES (re-hechos tras cada render) ---- */
@@ -861,7 +862,12 @@
     }
     $$('#contenido input[data-gauge]').forEach(inp => {
       inp.addEventListener('change', () => {
-        const campo = inp.dataset.gauge, v = numTab(inp.value);
+        // Casilla tecleada por humano: aceptar coma O punto como decimal (un
+        // porcentaje 0-110 no usa separador de miles), sin borrar el punto como
+        // sí hace numTab con los números de la base ("42.5" no debe volverse 425).
+        const campo = inp.dataset.gauge;
+        const s = String(inp.value).trim().replace(',', '.');
+        const v = (s==='' || isNaN(Number(s))) ? null : Number(s);
         estado.tab = estado.tab || {};
         if (!estado.tab['gestion']) estado.tab['gestion'] = gestion;   // enlaza el objeto local a estado
         gestion[campo] = v; gestion._por = sesion.nombre; gestion._fecha = Date.now();
