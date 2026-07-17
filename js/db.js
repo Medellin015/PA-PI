@@ -3,8 +3,12 @@
   const LS_KEY = 'segPC_datos_v1';
 
   const leerLocal = () => {
-    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{"pi":{},"pa":{}}'); }
-    catch(e){ return {pi:{}, pa:{}}; }
+    try {
+      const d = JSON.parse(localStorage.getItem(LS_KEY) || '{"pi":{},"pa":{},"tab":{}}');
+      d.pi = d.pi || {}; d.pa = d.pa || {}; d.tab = d.tab || {};   // compat. con datos guardados antes de 'tab'
+      return d;
+    }
+    catch(e){ return {pi:{}, pa:{}, tab:{}}; }
   };
   const escribirLocal = (d) => { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch(e){} };
 
@@ -17,11 +21,11 @@
       return this.modo;
     },
 
-    // Devuelve { pi:{id:parche}, pa:{id:parche} }
+    // Devuelve { pi:{id:parche}, pa:{id:parche}, tab:{id:parche} }
     async cargarTodo(){
       if (this.modo === 'firebase'){
-        const res = {pi:{}, pa:{}};
-        for (const col of ['pi','pa']){
+        const res = {pi:{}, pa:{}, tab:{}};
+        for (const col of ['pi','pa','tab']){
           try{
             const snap = await window.db.collection('seg_'+col).get();
             snap.forEach(doc => { res[col][doc.id] = doc.data(); });

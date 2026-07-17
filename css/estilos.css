@@ -185,6 +185,12 @@
   .tb-kpi-captura:focus-visible{ outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 40%, transparent); }
   #tb-topn:focus-visible{ outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 40%, transparent); }
 
+  /* Casilla editable de los medidores manuales (solo Equipo de Contratación) */
+  .tb-gedit{ color:var(--texto); }
+  .tb-gedit:focus-visible, .tb-gedit:focus{ outline:none; border-color:var(--acento);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 30%, transparent); }
+  .tb-editmark{ color:var(--acento); font-size:.85em; }
+
   /* Desplazamiento suave con margen para el ancla del ranking bajo el header sticky */
   .scroll-mt-24{ scroll-margin-top:6rem; }
 

@@ -4,7 +4,7 @@
   let sesion = { usuario:null, rol:'invitado', sub:null, nombre:'Invitado' };
   let vista = 'tablero';
   let filtroSubPA = 'Todas';
-  const estado = { pi:{}, pa:{} };          // parches cargados/editados
+  const estado = { pi:{}, pa:{}, tab:{} };  // parches cargados/editados (tab = medidores manuales del tablero)
   const SUBS = ['Planeación Local y Presupuesto Participativo','Formación Ciudadana','Organización Social','Unidad Administrativa'];
 
   const $ = (s, r=document) => r.querySelector(s);
@@ -153,7 +153,7 @@
 
     try{
       const datos = await window.DB.cargarTodo();
-      estado.pi = datos.pi || {}; estado.pa = datos.pa || {};
+      estado.pi = datos.pi || {}; estado.pa = datos.pa || {}; estado.tab = datos.tab || {};
     }catch(e){ console.warn(e); }
 
     if (!appLista){
@@ -567,32 +567,24 @@
     const meta2024 = promAnio('l24','m24');
     const meta2025 = promAnio('l25','m25');
 
-    // Presupuesto: sumar SOLO nivel Proyecto (evita doble conteo Pilar/Componente/Programa)
+    // Conteos de contexto para KPIs y ranking de productos
     const proyectos = PA_DATA.filter(f=>f.nivel==='Proyecto');
-    let pIni=0, pAj=0, pEj=0;
-    proyectos.forEach(f => { pIni += numTab(valTexto('pa',f,'pptoIni'))||0; pAj += numTab(valTexto('pa',f,'pptoAj'))||0; pEj += numTab(valTexto('pa',f,'ej3006'))||0; });
-    const pDisp = pAj - pEj;
-    const pDispMostrar = Math.max(0, pDisp);   // el texto 'Disponible' no muestra montos negativos ante sobre-ejecución (admin)
-    const ejecFin = pAj>0 ? pEj/pAj*100 : null;
-    const pctEjecSeg = pAj>0 ? Math.max(0, Math.min(100, pEj/pAj*100)) : 0;
-    const sobreEjec = pAj>0 && pEj>pAj;
-    const varPpto = pAj - pIni;
-    const varPctPpto = pIni>0 ? varPpto/pIni*100 : null;
-    const pilar = PA_DATA.find(f=>f.nivel==='Pilar');
-    const pilarAj = pilar ? numTab(pilar.pptoAj) : null;
-    const pilarEj = pilar ? numTab(pilar.ej3006) : null;
-
-    // Física de productos (BIEN) con fallback a ej0204
     const biens = PA_DATA.filter(f=>f.nivel==='BIEN');
-    let sf=0, nf=0;
+    // Cumplimiento por producto (BIEN) con fallback a ej0204 — alimenta el ranking "Productos"
     const filasPA = biens.map(b => {
       const v = valBIEN(b), plan = numTab(valTexto('pa',b,'plan'));
-      const pct = pctSeguro(v, plan);
-      if (pct!=null){ sf += Math.min(pct,200); nf++; }
-      return { cod:b.cod, nom:b.desc, sub:b.sub, pct };
+      return { cod:b.cod, nom:b.desc, sub:b.sub, pct: pctSeguro(v, plan) };
     });
-    const ejecFis = nf ? sf/nf : null;
-    const ponderadoFF = (ejecFin!=null && ejecFis!=null) ? 0.5*ejecFin+0.5*ejecFis : null;
+
+    // Medidores de gestión de CAPTURA MANUAL: los escribe el Equipo de Contratación.
+    // Se guardan como un parche en la colección 'tab' (doc 'gestion'). En modo local
+    // viven en este navegador; con Firebase se compartirían entre usuarios.
+    const gestion = (estado.tab && estado.tab['gestion']) || {};
+    const valGestion = (campo) => (campo in gestion) ? numTab(gestion[campo]) : null;
+    const ejecFin = valGestion('ejecFin');
+    const ejecFis = valGestion('ejecFis');
+    const ponderadoFF = valGestion('ff');
+    const puedeEditarTab = !!(sesion && sesion.rol==='admin');   // solo Equipo de Contratación
 
     /* ---- Pieza: KPI (mismo patrón visual que tarjeta()) ----
        Acepta clsCard extra para concatenar clases en el ÚNICO atributo class del
@@ -605,16 +597,17 @@
         ${sub?`<div class="text-[11px] txt-suave mt-0.5">${esc(sub)}</div>`:''}
       </div>`;
     const kpisHTML = `
-      <div id="tb-kpis" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      <div id="tb-kpis" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         ${kpi('Indicadores', String(totalPI), res+' de resultado · '+prod+' de producto')}
-        ${kpi('Presupuesto ajustado', fmtMill(pAj), (varPpto>=0?'+':'')+fmtMill(varPpto)+' ('+(varPctPpto==null?'—':(varPctPpto>=0?'+':'')+nfNum.format(varPctPpto)+'%')+') vs. inicial', (varPpto>=0?'text-green-600 dark:text-green-400':'text-red-500'))}
-        ${kpi('Ejecutado 30/06', fmtMill(pEj), (ejecFin==null?'—':nfNum.format(ejecFin)+'% del ajustado'))}
         ${kpi('Productos', String(biens.length), 'bienes en '+proyectos.length+' proyectos')}
         ${kpi('Captura 30/06', captura+'/'+totalPI, 'indicadores reportados', (captura<totalPI?'text-amber-500':'text-green-600 dark:text-green-400'), 'tb-kpi-captura', 'id="tb-kpi-captura" role="link" tabindex="0" title="Ir al ranking" style="cursor:pointer"')}
       </div>`;
 
-    /* ---- Pieza: Gauge semicircular SVG (fluido con viewBox) ---- */
-    const gauge = (titulo, pctVal, aria) => {
+    /* ---- Pieza: Gauge semicircular SVG (fluido con viewBox) ----
+       opts.campo => medidor de captura manual (colección 'tab'); si el rol es
+       Equipo de Contratación, se muestra un input para escribir el porcentaje. */
+    const gauge = (titulo, pctVal, aria, opts) => {
+      opts = opts || {};
       const c = colorPct(pctVal);
       const clsTxt = (pctVal==null) ? 'txt-suave' : c[1];
       const R = 80, LEN = Math.PI*R;
@@ -623,15 +616,27 @@
       const offFinal = LEN*(1-frac);
       const path = `M 20 100 A ${R} ${R} 0 0 1 180 100`;
       const label = pct1(pctVal);
+      const idAttr = opts.campo ? `id="tb-g-${esc(opts.campo)}" data-aria="${esc(aria)}"` : '';
+      // Editor SOLO para admin. Usa data-gauge (no data-campo) para no chocar con
+      // enlazarEdicion(), que además no corre en la vista tablero.
+      const editor = (opts.campo && puedeEditarTab) ? `
+          <div class="mt-1 flex items-center justify-center gap-1">
+            <input type="text" inputmode="decimal" autocomplete="off" placeholder="—" aria-label="Editar ${esc(aria)} en porcentaje"
+                   class="tb-gedit panel borde border rounded-md px-2 py-0.5 text-xs text-right tabular-nums" style="width:76px"
+                   data-gauge="${esc(opts.campo)}" value="${pctVal==null?'':esc(nfNum.format(pctVal))}" />
+            <span class="text-[11px] txt-suave">%</span>
+          </div>` : '';
+      const marca = (opts.campo && puedeEditarTab) ? ' <span class="tb-editmark" title="Editable por el Equipo de Contratación">✎</span>' : '';
       return `
-        <div class="tb-gauge flex flex-col items-center anim-pop">
+        <div class="tb-gauge flex flex-col items-center anim-pop" ${idAttr}>
           <svg viewBox="0 0 200 118" style="width:100%;max-width:150px" role="img" aria-label="${esc(aria)}: ${esc(label)}">
             <path d="${path}" fill="none" stroke="var(--suave)" stroke-opacity=".2" stroke-width="14" stroke-linecap="round" aria-hidden="true"/>
             <path class="tb-arc ${clsTxt}" d="${path}" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"
-                  stroke-dasharray="${LEN.toFixed(2)}" stroke-dashoffset="${offInicial.toFixed(2)}" data-off="${offFinal.toFixed(2)}" aria-hidden="true"/>
-            <text x="100" y="92" text-anchor="middle" class="${clsTxt}" fill="currentColor" font-size="30" font-weight="700" style="font-variant-numeric:tabular-nums">${esc(label)}</text>
+                  stroke-dasharray="${LEN.toFixed(2)}" stroke-dashoffset="${offInicial.toFixed(2)}" data-off="${offFinal.toFixed(2)}" data-len="${LEN.toFixed(2)}" aria-hidden="true"/>
+            <text class="tb-gnum ${clsTxt}" x="100" y="92" text-anchor="middle" fill="currentColor" font-size="30" font-weight="700" style="font-variant-numeric:tabular-nums">${esc(label)}</text>
           </svg>
-          <div class="text-[11px] txt-suave text-center mt-0.5 leading-tight">${esc(titulo)}</div>
+          <div class="text-[11px] txt-suave text-center mt-0.5 leading-tight">${esc(titulo)}${marca}</div>
+          ${editor}
         </div>`;
     };
     const gaugesHTML = `
@@ -640,11 +645,11 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           ${gauge('Avance meta 2026', avance2026, 'Avance meta 2026')}
           ${gauge('Reportados 30/06', reportados, 'Indicadores reportados')}
-          ${gauge('Ejec. financiera', ejecFin, 'Ejecución financiera')}
-          ${gauge('Ejec. física', ejecFis, 'Ejecución física de productos')}
-          ${gauge('Índice físico-financiero', ponderadoFF, 'Índice físico-financiero')}
+          ${gauge('Ejec. financiera', ejecFin, 'Ejecución financiera', {campo:'ejecFin'})}
+          ${gauge('Ejec. física', ejecFis, 'Ejecución física', {campo:'ejecFis'})}
+          ${gauge('Índice físico-financiero', ponderadoFF, 'Índice físico-financiero', {campo:'ff'})}
         </div>
-        <p class="text-[11px] txt-suave mt-2">Promedios sobre ${totalPI} indicadores y ${biens.length} productos. El índice físico-financiero pondera 50% ejecución financiera y 50% física.</p>
+        <p class="text-[11px] txt-suave mt-2">Avance y reportados se calculan de los ${totalPI} indicadores. La ejecución financiera, la física y el índice físico-financiero ${puedeEditarTab?'los registra usted (Equipo de Contratación) en las casillas de cada medidor':'los registra el Equipo de Contratación'}.</p>
       </div>`;
 
     /* ---- Pieza: Dona de categorías (SVG stroke-dasharray) ---- */
@@ -690,27 +695,6 @@
           <div class="flex-1 space-y-0.5">${leyendaDona}</div>
         </div>
         <p class="text-[10px] txt-suave mt-1">Clic en una categoría para filtrar el ranking.${clasificados<totalPI?' '+(totalPI-clasificados)+' sin dato clasificable.':''}</p>
-      </div>`;
-
-    /* ---- Pieza: Barra apilada de presupuesto ---- */
-    const cEjec = colorPct(ejecFin);
-    const budgetHTML = `
-      <div id="tb-budget" class="tb-card panel borde border rounded-xl p-3 anim-up">
-        <div class="flex items-baseline justify-between flex-wrap gap-1 mb-2">
-          <div class="text-sm font-bold">Ejecución presupuestal (${proyectos.length} proyectos)</div>
-          <div class="text-[11px] txt-suave">Ajustado ${fmtMill(pAj)}</div>
-        </div>
-        <div class="w-full h-6 rounded-lg overflow-hidden flex border borde" role="img" aria-label="Ejecutado ${esc(pct1(ejecFin))} de ${esc(fmtMill(pAj))}">
-          <div class="tb-bseg h-full flex items-center justify-center text-[10px] font-semibold text-white" style="width:${reduce?pctEjecSeg.toFixed(2):'0'}%;background:var(--acento)" data-w="${pctEjecSeg.toFixed(2)}" title="Ejecutado: ${esc(fmtMill(pEj))} (${esc(pct1(ejecFin))})">${pctEjecSeg>=12?esc(pct1(ejecFin)):''}</div>
-          <div class="tb-bseg h-full" style="width:${reduce?(100-pctEjecSeg).toFixed(2):'100'}%;background:var(--suave);opacity:.18" data-w="${(100-pctEjecSeg).toFixed(2)}" title="Disponible: ${esc(fmtMill(pDispMostrar))} (${esc(pct1(100-pctEjecSeg))})"></div>
-        </div>
-        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px]">
-          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background:var(--acento)" aria-hidden="true"></span>Ejecutado <b class="${cEjec[1]}">${esc(fmtMill(pEj))}</b> (${esc(pct1(ejecFin))})</span>
-          <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background:var(--suave);opacity:.35" aria-hidden="true"></span>Disponible <b>${esc(fmtMill(pDispMostrar))}</b> (${esc(pct1(100-pctEjecSeg))})</span>
-          <span class="txt-suave">Inicial ${esc(fmtMill(pIni))} → Ajustado ${esc(fmtMill(pAj))}</span>
-        </div>
-        ${sobreEjec?`<p class="text-[11px] text-red-500 mt-2">El ejecutado supera el ajustado en ${esc(fmtMill(pEj-pAj))}; la barra se limita al 100%.</p>`:''}
-        <p class="text-[11px] txt-suave mt-2">Agregado sobre los ${proyectos.length} Proyectos. El total del Pilar reporta ${esc(fmtMill(pilarAj))} / ${esc(fmtMill(pilarEj))}; el saldo (${esc(fmtMill((pilarAj||0)-pAj))} ajustado, ${esc(fmtMill((pilarEj||0)-pEj))} ejecutado) no está distribuido a nivel proyecto.</p>
       </div>`;
 
     /* ---- Pieza: Metas por vigencia ---- */
@@ -782,7 +766,6 @@
           ${gaugesHTML}
           ${donaHTML}
         </div>
-        ${budgetHTML}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
           ${metasHTML}
           ${rankingHTML}
@@ -863,6 +846,30 @@
       capEl.onclick = irRanking;
       capEl.onkeydown = (e) => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); irRanking(); } };
     }
+
+    /* ---- Medidores manuales (Equipo de Contratación): guarda y redibuja en sitio ---- */
+    function refrescarGauge(campo){
+      const v = valGestion(campo);
+      const wrap = $('#tb-g-'+campo); if (!wrap) return;
+      const arc = wrap.querySelector('.tb-arc'), num = wrap.querySelector('.tb-gnum'), svg = wrap.querySelector('svg');
+      const clsTxt = (v==null) ? 'txt-suave' : colorPct(v)[1];
+      const LEN = parseFloat(arc && arc.getAttribute('data-len')) || Math.PI*80;
+      const frac = (v==null) ? 0 : Math.max(0, Math.min(1, v/100));
+      if (arc){ arc.setAttribute('class','tb-arc '+clsTxt); arc.style.strokeDashoffset = (LEN*(1-frac)).toFixed(2); }
+      if (num){ num.setAttribute('class','tb-gnum '+clsTxt); num.textContent = pct1(v); }
+      if (svg){ svg.setAttribute('aria-label', (wrap.dataset.aria||'')+': '+pct1(v)); }
+    }
+    $$('#contenido input[data-gauge]').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const campo = inp.dataset.gauge, v = numTab(inp.value);
+        estado.tab = estado.tab || {};
+        if (!estado.tab['gestion']) estado.tab['gestion'] = gestion;   // enlaza el objeto local a estado
+        gestion[campo] = v; gestion._por = sesion.nombre; gestion._fecha = Date.now();
+        refrescarGauge(campo);
+        window.DB.guardar('tab','gestion', { [campo]: v, _por: gestion._por, _fecha: gestion._fecha })
+          .then(()=>toast('Guardado','ok')).catch(()=>toast('No se pudo guardar','err'));
+      });
+    });
 
     pintarRanking();
     if (!reduce && typeof requestAnimationFrame==='function') requestAnimationFrame(() => requestAnimationFrame(animarBarras));
