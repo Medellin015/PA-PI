@@ -1,13 +1,15 @@
 'use strict';
 
-// >>> PEGUE AQUÍ la configuración de su proyecto Firebase para habilitar el modo compartido <<<
+// Configuración del proyecto Firebase (cliente). Es pública por diseño: identifica
+// el proyecto, no autoriza nada por sí sola. La seguridad real vive en las reglas
+// de Firestore (ver firestore.rules), no en ocultar esta config.
 const firebaseConfig = {
-  apiKey: "PEGUE_SU_API_KEY",
-  authDomain: "PEGUE_SU_PROYECTO.firebaseapp.com",
-  projectId: "PEGUE_SU_PROYECTO",
-  storageBucket: "PEGUE_SU_PROYECTO.appspot.com",
-  messagingSenderId: "PEGUE_SENDER_ID",
-  appId: "PEGUE_APP_ID"
+  apiKey: "AIzaSyDdu-OxQ62XyXxZcKi87KfiD-e7H_Wud6o",
+  authDomain: "pa-pi-80daa.firebaseapp.com",
+  projectId: "pa-pi-80daa",
+  storageBucket: "pa-pi-80daa.firebasestorage.app",
+  messagingSenderId: "246320771954",
+  appId: "1:246320771954:web:9fc1148da3f7529571a3eb"
 };
 
 window.MODO_FIREBASE = firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('PEGUE_') === -1;
