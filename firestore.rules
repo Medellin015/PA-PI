@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// ============================================================================
+// Reglas de seguridad de Firestore — Seguimiento Participación Ciudadana
+// La app abre una sesión ANÓNIMA de Firebase al cargar (window.authReady) y la
+// autorización por rol (Equipo de Contratación, subsecretarías, invitado) se
+// resuelve en el cliente. Por eso estas reglas permiten leer/escribir a
+// cualquier sesión firmada; todo lo no declarado queda denegado.
+// Si más adelante se requiere control por servidor, migrar a usuarios reales de
+// Firebase Auth y distinguir realUser() (sign_in_provider != 'anonymous').
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sesión firmada (incluye la sesión anónima que abre la app).
+    function signedIn() { return request.auth != null; }
+
+    // Parches del Plan Indicativo (valor 30/06, observaciones, evidencias, …)
+    match /seg_pi/{doc}  { allow read, write: if signedIn(); }
+
+    // Parches del Plan de Acción (valor estadístico, justificación, evidencias)
+    match /seg_pa/{doc}  { allow read, write: if signedIn(); }
+
+    // Medidores de captura manual del Tablero (doc 'gestion')
+    match /seg_tab/{doc} { allow read, write: if signedIn(); }
+
+    // Denegar todo lo demás.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

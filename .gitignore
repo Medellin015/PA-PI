@@ -1,0 +1,12 @@
+# Nunca subir credenciales de servidor (Admin SDK) ni secretos.
+# El cliente solo necesita firebaseConfig (público); el Admin SDK es privado.
+*serviceAccount*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+service-account*.json
+.env
+.env.*
+
+# Basura de sistema / editor
+.DS_Store
+Thumbs.db

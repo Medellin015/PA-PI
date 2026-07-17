@@ -72,11 +72,27 @@ El rol elegido se recuerda al recargar (mientras dure la pestaña).
 > robusto): cualquiera con acceso al archivo puede leerlas. Cámbielas en
 > `js/datos.js` según sea necesario (campo `clave`).
 
-## Conectar Firebase (opcional)
+## Firebase (modo compartido)
 
-Para compartir datos entre usuarios, pegue su configuración real en
-`js/firebase-config.js` (objeto `firebaseConfig`). Mientras tenga los valores de
-ejemplo `PEGUE_…`, la app sigue en modo local.
+La app ya trae la configuración del proyecto `pa-pi-80daa` en
+`js/firebase-config.js` (es config **de cliente**, pública por diseño). Guarda en
+las colecciones `seg_pi`, `seg_pa` y `seg_tab` de Firestore, sobre una sesión
+anónima de Firebase. Para que funcione en línea hay que dejar habilitado en la
+consola de Firebase (una sola vez):
+
+1. **Firestore Database** → *Crear base de datos* (modo producción, región p. ej.
+   `southamerica-east1` o `nam5`).
+2. **Authentication** → *Sign-in method* → habilitar **Anónimo**.
+3. **Firestore → Reglas** → pegar el contenido de [`firestore.rules`](firestore.rules)
+   y *Publicar*.
+
+Si no hay red o Firebase no está disponible, la app **degrada a modo local**
+(localStorage) automáticamente, sin romperse.
+
+> **Seguridad:** la config de cliente es pública y va en el repo; eso es
+> correcto. En cambio, **el archivo de cuenta de servicio (Admin SDK) es un
+> secreto** y NO debe subirse al repositorio ni al navegador (el `.gitignore` ya
+> lo bloquea). La app cliente no lo necesita.
 
 ## Nota sobre un error corregido
 
