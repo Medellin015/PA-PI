@@ -89,6 +89,40 @@
   }
   .celda{ border-bottom:1px solid var(--borde); }
   .col-fija{ position:sticky; left:0; z-index:4; background:var(--panel); }
+
+  /* ===== AutoFiltro por columna (estilo Excel) ===== */
+  .th-conf{ position:relative; }
+  .th-filtro{
+    margin-left:4px; padding:0 3px; border:0; background:transparent; cursor:pointer;
+    color:var(--suave); opacity:.5; font-size:.9em; line-height:1; border-radius:4px;
+    transition:opacity .15s, background .15s, color .15s; vertical-align:middle;
+  }
+  .th-conf:hover .th-filtro{ opacity:.9; }
+  .th-filtro:hover{ background:color-mix(in srgb, var(--acento) 15%, transparent); color:var(--acento); }
+  .th-filtro.activo{ opacity:1; color:#fff; background:var(--acento); }
+  .th-filtro:focus-visible{ outline:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--acento) 50%, transparent); }
+
+  #colFilterPopup{
+    position:absolute; z-index:150; width:250px; max-width:90vw; border-radius:12px; padding:10px;
+    box-shadow:var(--sombra-2); font-size:.85rem;
+  }
+  #colFilterPopup .cf-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  #colFilterPopup .cf-title{ font-weight:700; font-size:.8rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #colFilterPopup .cf-x{ border:0; background:transparent; color:var(--suave); cursor:pointer; font-size:.9rem; padding:2px 6px; border-radius:6px; }
+  #colFilterPopup .cf-x:hover{ background:color-mix(in srgb, var(--suave) 15%, transparent); color:var(--texto); }
+  #colFilterPopup .cf-search{ width:100%; border-radius:8px; padding:6px 9px; font-size:.8rem; margin-bottom:8px; }
+  #colFilterPopup .cf-search:focus{ outline:none; border-color:var(--acento); box-shadow:0 0 0 3px color-mix(in srgb, var(--acento) 18%, transparent); }
+  .cf-list{ max-height:230px; overflow-y:auto; display:flex; flex-direction:column; gap:1px; margin:0 -2px; padding:2px; }
+  .cf-item{ display:flex; align-items:center; gap:8px; padding:5px 7px; border-radius:7px; cursor:pointer; }
+  .cf-item:hover{ background:color-mix(in srgb, var(--acento) 8%, transparent); }
+  .cf-item .cf-chk{ accent-color:var(--acento); flex:none; }
+  .cf-item .cf-txt{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cf-empty{ padding:10px; text-align:center; font-size:.8rem; }
+  .cf-actions{ display:flex; gap:6px; margin-top:9px; }
+  .cf-mini{ flex:1; border:1px solid var(--borde); background:var(--panel); color:var(--texto);
+    border-radius:8px; padding:6px 8px; font-size:.76rem; font-weight:600; cursor:pointer; transition:.15s; }
+  .cf-mini:hover{ background:color-mix(in srgb, var(--suave) 12%, transparent); }
+  .cf-mini.cf-apply{ background:linear-gradient(135deg,var(--acento),var(--acento2)); color:#fff; border-color:transparent; }
   /* Contenedor de tabla con sombra suave */
   #contenido > .panel{ box-shadow:var(--sombra-1); }
   /* Zebra sutil en Plan Indicativo (filas con data-tipo) y hover unificado.

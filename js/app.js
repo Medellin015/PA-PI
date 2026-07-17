@@ -166,6 +166,7 @@
       $('#btn-exportar').onclick = exportarExcel;
       pintarSelectorRol();
       enlazarModalClave();
+      enlazarPopupFiltro();
     }
     actualizarBadges();
     render();
@@ -208,6 +209,8 @@
     pintarFiltros();
     if (vista==='indicativo') renderPI(); else renderPA();
     enlazarEdicion();
+    inyectarEmbudos();     // AutoFiltro por columna (embudos ▾)
+    aplicarFiltros();      // reaplica filtros de columna + búsqueda tras el re-render
   }
 
   function tarjeta(t, v, sub, cls){
@@ -248,40 +251,163 @@
 
   function pintarFiltros(){
     const f = $('#filtros');
+    const buscador = (ph) => `
+        <input id="f-busca" placeholder="${ph}" autocomplete="off" class="panel borde border rounded-lg px-3 py-1.5 text-xs w-56 focus:outline-none" />
+        <button id="f-limpiar" type="button" class="text-xs px-2.5 py-1.5 rounded-lg borde border hover:bg-black/5 dark:hover:bg-white/5" style="display:none">🧹 Quitar filtros</button>
+        <span class="text-[11px] txt-suave">▾ en cada columna para filtrar como en Excel</span>`;
     if (vista==='accion'){
       const opts = ['Todas', ...SUBS].map(s =>
         `<option value="${esc(s)}" ${s===filtroSubPA?'selected':''}>${s==='Todas'?'Todas las subsecretarías':esc(s)}</option>`).join('');
       f.innerHTML = `
         <span class="text-xs txt-suave">Subsecretaría:</span>
         <select id="f-sub" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">${opts}</select>
-        <select id="f-nivel" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">
-          <option value="">Todos los niveles</option>
-          <option value="Programa">Solo programas</option>
-          <option value="Proyecto">Solo proyectos</option>
-          <option value="BIEN">Solo productos</option>
-        </select>
-        <input id="f-busca" placeholder="Buscar producto o proyecto…" class="panel borde border rounded-lg px-3 py-1.5 text-xs w-56 focus:outline-none" />`;
+        ${buscador('Buscar producto o proyecto…')}`;
       $('#f-sub').onchange = e => { filtroSubPA = e.target.value; render(); };
-      $('#f-nivel').onchange = aplicarFiltrosPA;
-      $('#f-busca').oninput = aplicarFiltrosPA;
     } else {
-      f.innerHTML = `
-        <select id="f-tipo" class="panel borde border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none">
-          <option value="">Todos los indicadores</option>
-          <option value="Resultado">Solo resultado</option>
-          <option value="Producto">Solo producto</option>
-        </select>
-        <input id="f-busca" placeholder="Buscar indicador…" class="panel borde border rounded-lg px-3 py-1.5 text-xs w-56 focus:outline-none" />`;
-      $('#f-tipo').onchange = () => renderPIfiltrado();
-      $('#f-busca').oninput = e => filtrarTexto(e.target.value);
+      f.innerHTML = buscador('Buscar indicador…');
+    }
+    $('#f-busca').oninput = aplicarFiltros;
+    $('#f-limpiar').onclick = limpiarFiltrosCol;
+  }
+
+  /* ===== 4.b AutoFiltro por columna (estilo Excel) =====
+     Cada encabezado recibe un embudo ▾ que abre un popup con búsqueda + casillas
+     de los valores de la columna y Todos/Ninguno/Aplicar. Los filtros por columna
+     se combinan (Y) con el buscador global. Estado por vista e índice de columna;
+     se aplican ocultando filas (no re-renderiza). */
+  const filtrosCol = { indicativo:{}, accion:{} };   // { idx: Set(valores) }
+  let popupColIdx = null;
+
+  const VISTA_FILTRO = {
+    indicativo: { filas: () => $$('#contenido tbody tr[data-tipo]'),       grupos:false },
+    accion:     { filas: () => $$('#contenido tbody tr[data-nivel="BIEN"]'), grupos:true },
+  };
+  const tablaFiltrable = () => vista==='indicativo' || vista==='accion';
+
+  // Valor efectivo de una celda para el filtro (usa el input/textarea si existe).
+  function valorColumna(tr, idx){
+    const td = tr.children[idx];
+    if (!td) return '';
+    const campo = td.querySelector('input, textarea, select');
+    const v = campo ? campo.value : td.textContent;
+    return (v==null ? '' : String(v)).replace(/\s+/g,' ').trim();
+  }
+
+  // Inyecta un embudo en cada encabezado (idempotente por render).
+  function inyectarEmbudos(){
+    if (!tablaFiltrable()) return;
+    $$('#contenido thead th').forEach((th, idx) => {
+      if (th.querySelector('.th-filtro')) return;
+      th.classList.add('th-conf');
+      const b = document.createElement('button');
+      b.type='button'; b.className='th-filtro'; b.title='Filtrar esta columna'; b.dataset.idx=idx; b.textContent='▾';
+      b.addEventListener('click', e => { e.stopPropagation(); abrirFiltroCol(idx, th); });
+      th.appendChild(b);
+    });
+    marcarEmbudosActivos();
+  }
+  function marcarEmbudosActivos(){
+    const fcol = filtrosCol[vista] || {};
+    $$('#contenido thead th .th-filtro').forEach(b => b.classList.toggle('activo', !!fcol[b.dataset.idx]));
+    const btn = $('#f-limpiar');
+    if (btn){
+      const n = Object.keys(fcol).filter(k=>fcol[k]).length;
+      btn.style.display = n ? '' : 'none';
+      btn.textContent = '🧹 Quitar filtros' + (n?` (${n})`:'');
     }
   }
 
-  function filtrarTexto(q){
-    q = (q||'').toLowerCase().trim();
-    $$('#contenido tr[data-busca]').forEach(tr => {
-      tr.style.display = !q || tr.dataset.busca.includes(q) ? '' : 'none';
+  // Aplica filtros de columna + búsqueda global a la vista actual (ocultando filas).
+  function aplicarFiltros(){
+    if (!tablaFiltrable()) return;
+    const q = ($('#f-busca') ? $('#f-busca').value : '').toLowerCase().trim();
+    const fcol = filtrosCol[vista] || {};
+    const cols = Object.keys(fcol).filter(k=>fcol[k]).map(Number);
+    const pasa = (tr) => {
+      if (q && !(tr.dataset.busca||'').includes(q)) return false;
+      for (const idx of cols){ if (!fcol[idx].has(valorColumna(tr, idx))) return false; }
+      return true;
+    };
+    if (!VISTA_FILTRO[vista].grupos){
+      VISTA_FILTRO[vista].filas().forEach(tr => { tr.style.display = pasa(tr) ? '' : 'none'; });
+    } else {
+      // Plan de Acción: filtra productos (BIEN) y oculta grupos sin hijos visibles.
+      let prog=null, progVis=false, proy=null, proyVis=false;
+      const cerrarProy = ()=>{ if(proy) proy.style.display = proyVis?'':'none'; };
+      const cerrarProg = ()=>{ if(prog) prog.style.display = progVis?'':'none'; };
+      $$('#contenido tbody tr').forEach(tr => {
+        const niv = tr.dataset.nivel;
+        if (niv==='Programa'){ cerrarProy(); cerrarProg(); prog=tr; progVis=false; proy=null; proyVis=false; }
+        else if (niv==='Proyecto'){ cerrarProy(); proy=tr; proyVis=false; }
+        else if (niv==='BIEN'){ const ok = pasa(tr); tr.style.display = ok?'':'none'; if(ok){ proyVis=true; progVis=true; } }
+      });
+      cerrarProy(); cerrarProg();
+    }
+    marcarEmbudosActivos();
+  }
+
+  // --- Popup del AutoFiltro ---
+  function abrirFiltroCol(idx, th){
+    popupColIdx = idx;
+    const pop = $('#colFilterPopup');
+    const nombre = (th.textContent||'').replace('▾','').replace(/[✎]/g,'').replace(/\s+/g,' ').trim();
+    $('#popupColName').textContent = nombre || ('Columna '+(idx+1));
+    $('#colFilterSearch').value = '';
+    const set = new Set();
+    VISTA_FILTRO[vista].filas().forEach(tr => set.add(valorColumna(tr, idx)));
+    const activos = (filtrosCol[vista]||{})[idx] || null;   // null => todos marcados
+    const valores = Array.from(set).sort((a,b)=> a.localeCompare(b, 'es', {numeric:true, sensitivity:'base'}));
+    $('#colFilterList').innerHTML = valores.map(v => {
+      const marcado = activos ? activos.has(v) : true;
+      const etq = (v==='') ? '(Vacías)' : esc(v);
+      return `<label class="cf-item"><input type="checkbox" class="cf-chk" value="${esc(v)}" ${marcado?'checked':''}><span class="cf-txt" title="${etq}">${etq}</span></label>`;
+    }).join('') || '<div class="cf-empty txt-suave">Sin valores</div>';
+    // Posicionar junto al encabezado, dentro del viewport.
+    pop.style.display = 'block';
+    const r = th.getBoundingClientRect();
+    const pw = pop.offsetWidth || 240;
+    const maxLeft = window.scrollX + document.documentElement.clientWidth - pw - 8;
+    pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, maxLeft)) + 'px';
+    pop.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    setTimeout(() => { const s=$('#colFilterSearch'); if(s) s.focus(); }, 30);
+  }
+  function buscarEnFiltro(){
+    const q = $('#colFilterSearch').value.toLowerCase().trim();
+    $$('#colFilterList .cf-item').forEach(it => {
+      const t = it.querySelector('.cf-txt').textContent.toLowerCase();
+      it.style.display = (!q || t.includes(q)) ? '' : 'none';
     });
+  }
+  function marcarTodosFiltro(val){
+    $$('#colFilterList .cf-item').forEach(it => { if (it.style.display!=='none') it.querySelector('.cf-chk').checked = val; });
+  }
+  function aplicarFiltroCol(){
+    if (popupColIdx==null) return;
+    const chks = $$('#colFilterList .cf-chk');
+    const marcados = chks.filter(c=>c.checked).map(c=>c.value);
+    const fcol = filtrosCol[vista] || (filtrosCol[vista] = {});
+    if (marcados.length === chks.length) delete fcol[popupColIdx];   // todos => sin filtro
+    else fcol[popupColIdx] = new Set(marcados);
+    cerrarFiltroCol();
+    aplicarFiltros();
+  }
+  function cerrarFiltroCol(){ const p=$('#colFilterPopup'); if(p) p.style.display='none'; popupColIdx=null; }
+  function limpiarFiltrosCol(){ filtrosCol[vista] = {}; const q=$('#f-busca'); if(q) q.value=''; cerrarFiltroCol(); aplicarFiltros(); }
+
+  // Enganche único de los controles estáticos del popup (index.html).
+  function enlazarPopupFiltro(){
+    const on = (id, ev, fn) => { const el=$(id); if(el) el[ev]=fn; };
+    on('#colFilterSearch','oninput', buscarEnFiltro);
+    on('#cf-all','onclick', () => marcarTodosFiltro(true));
+    on('#cf-none','onclick', () => marcarTodosFiltro(false));
+    on('#cf-apply','onclick', aplicarFiltroCol);
+    on('#cf-close','onclick', cerrarFiltroCol);
+    // Cerrar al hacer clic fuera del popup o al presionar Escape.
+    document.addEventListener('click', e => {
+      const pop = $('#colFilterPopup');
+      if (pop && pop.style.display==='block' && !pop.contains(e.target) && !(e.target.classList && e.target.classList.contains('th-filtro'))) cerrarFiltroCol();
+    });
+    document.addEventListener('keydown', e => { if (e.key==='Escape') cerrarFiltroCol(); });
   }
 
   /* ===== 5. Render: Plan Indicativo ===== */
@@ -350,13 +476,6 @@
       </div>
       <p class="text-[11px] txt-suave mt-2">✎ columnas editables${editaTodo?' (como administrador puede editar todas las celdas)':' para su rol'}. El % de avance se calcula automáticamente sobre la meta 2026.</p>`;
   }
-  function renderPIfiltrado(){
-    const t = $('#f-tipo') ? $('#f-tipo').value : '';
-    $$('#contenido tr[data-tipo]').forEach(tr => {
-      tr.style.display = (!t || tr.dataset.tipo===t) ? '' : 'none';
-    });
-  }
-
   /* ===== 6. Render: Plan de Acción ===== */
   function arbolPA(){
     const prog = [];
@@ -500,16 +619,6 @@
   }
 
   // Filtros combinados (nivel + texto) para la tabla del Plan de Acción
-  function aplicarFiltrosPA(){
-    const niv = $('#f-nivel') ? $('#f-nivel').value : '';
-    const q = ($('#f-busca') ? $('#f-busca').value : '').toLowerCase().trim();
-    $$('#contenido tr[data-busca]').forEach(tr => {
-      const okNiv = !niv || tr.dataset.nivel===niv;
-      const okQ = !q || (tr.dataset.busca||'').includes(q);
-      tr.style.display = (okNiv && okQ) ? '' : 'none';
-    });
-  }
-
   /* ===== 6.b Render: Tablero (dashboard ejecutivo, solo lectura) =====
      Se calcula 100% desde PI_DATA/PA_DATA + parches en vivo (estado.pi/estado.pa)
      leídos vía valTexto. No emite inputs/textarea ni atributos data-campo:
