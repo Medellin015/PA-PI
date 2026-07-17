@@ -96,6 +96,21 @@
   </div>
 </div>
 
+<!-- ===================== POPUP DE AUTOFILTRO POR COLUMNA (estilo Excel) ===================== -->
+<div id="colFilterPopup" class="panel borde border" style="display:none">
+  <div class="cf-head">
+    <span id="popupColName" class="cf-title">Columna</span>
+    <button id="cf-close" type="button" class="cf-x" title="Cerrar">✕</button>
+  </div>
+  <input id="colFilterSearch" type="text" placeholder="🔍 Buscar…" autocomplete="off" class="cf-search panel borde border" />
+  <div id="colFilterList" class="cf-list"></div>
+  <div class="cf-actions">
+    <button id="cf-all" type="button" class="cf-mini">Todos</button>
+    <button id="cf-none" type="button" class="cf-mini">Ninguno</button>
+    <button id="cf-apply" type="button" class="cf-mini cf-apply">Aplicar</button>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <!-- ============================================================================
